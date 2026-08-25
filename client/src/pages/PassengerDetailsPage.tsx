@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Mail, Phone, UserRound } from "lucide-react";
 
 import Badge from "../components/ui/Badge";
@@ -17,6 +17,7 @@ type PassengerForm = {
 };
 
 function PassengerDetailsPage() {
+  const navigate = useNavigate();
   const { id } = useParams();
   const [passenger, setPassenger] = useState<PassengerForm>({
     name: "",
@@ -216,7 +217,12 @@ function PassengerDetailsPage() {
             </div>
 
             <div className="mt-7">
-              <Button disabled={!isFormValid}>Continue to Payment</Button>
+              <Button
+                disabled={!isFormValid}
+                onClick={() => navigate(`/bus/${id}/payment`)}
+              >
+                Continue to Payment
+              </Button>
             </div>
           </Card>
         </div>
