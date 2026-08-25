@@ -12,8 +12,11 @@ import {
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
+import { useNavigate, useParams } from "react-router-dom";
 
 function BusDetailsPage() {
+  const navigate = useNavigate();
+  const { id } = useParams();
   return (
     <main className="min-h-screen bg-background">
       <section className="mx-auto max-w-7xl px-6 py-10">
@@ -178,7 +181,7 @@ function BusDetailsPage() {
             </div>
 
             <div className="mt-7">
-              <Button>
+              <Button onClick={() => navigate(`/bus/${id}/seats`)}>
                 <span className="flex items-center justify-center gap-2">
                   <Armchair size={18} />
                   Select Seats
