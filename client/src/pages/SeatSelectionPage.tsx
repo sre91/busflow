@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Armchair, Check, UserRound } from "lucide-react";
 
 import Badge from "../components/ui/Badge";
@@ -42,6 +43,8 @@ const seats: Seat[] = [
 
 function SeatSelectionPage() {
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
+  const navigate = useNavigate();
+  const { id } = useParams();
 
   const toggleSeat = (seat: Seat) => {
     if (seat.status === "booked") {
@@ -224,7 +227,12 @@ function SeatSelectionPage() {
             </div>
 
             <div className="mt-7">
-              <Button disabled={selectedSeats.length === 0}>Continue</Button>
+              <Button
+                disabled={selectedSeats.length === 0}
+                onClick={() => navigate(`/bus/${id}/passenger`)}
+              >
+                Continue
+              </Button>
             </div>
           </Card>
         </div>
