@@ -1,7 +1,8 @@
+import "dotenv/config";
+
 import app from "./app.js";
+import env from "./config/env.js";
 
-const PORT = 5000;
-
-app.listen(PORT, () => {
-  console.log(`🚌 BusFlow server running on http://localhost:${PORT}`);
+app.listen(env.PORT, () => {
+  console.log(`🚌 BusFlow server running on port ${env.PORT}`);
 });
