@@ -1,9 +1,9 @@
 import express from "express";
 
-import healthRoutes from "./routes/healthRoutes.js";
 import notFoundMiddleware from "./middleware/notFoundMiddleware.js";
 import errorMiddleware from "./middleware/errorMiddleware.js";
 import requestLogger from "./middleware/requestLogger.js";
+import apiRoutes from "./routes/apiRoutes.js";
 
 const app = express();
 
@@ -17,7 +17,7 @@ app.get("/", (_req, res) => {
   });
 });
 
-app.use("/api/health", healthRoutes);
+app.use("/api/v1", apiRoutes);
 
 app.use(notFoundMiddleware);
 
