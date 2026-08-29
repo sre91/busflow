@@ -4,8 +4,9 @@ export const sendSuccess = (
   res: Response,
   data: unknown,
   message = "Request successful",
-) => {
-  res.status(200).json({
+  statusCode = 200,
+): void => {
+  res.status(statusCode).json({
     success: true,
     message,
     data,

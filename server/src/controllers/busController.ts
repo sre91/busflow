@@ -73,3 +73,17 @@ export const getBusById = async (
     next(error);
   }
 };
+
+export const createBus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const bus = await Bus.create(req.body);
+
+    sendSuccess(res, bus, "Bus created successfully", 201);
+  } catch (error) {
+    next(error);
+  }
+};
