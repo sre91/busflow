@@ -6,7 +6,7 @@ import Button from "./Button";
 import Card from "./Card";
 
 type BusCardProps = {
-  id: number;
+  id: string;
   operator: string;
   busType: string;
   departure: string;

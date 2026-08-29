@@ -1,50 +1,36 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import Badge from "../components/ui/Badge";
 import BusCard from "../components/ui/BusCard";
 import Card from "../components/ui/Card";
-
-type Bus = {
-  id: number;
-  operator: string;
-  busType: string;
-  departure: string;
-  arrival: string;
-  route: string;
-  rating: number;
-  seatsAvailable: number;
-  price: number;
-};
-
-const buses: Bus[] = [
-  {
-    id: 1,
-    operator: "BlueLine Travels",
-    busType: "AC Sleeper",
-    departure: "10:30 PM",
-    arrival: "06:30 AM",
-    route: "Chennai → Bangalore",
-    rating: 4.6,
-    seatsAvailable: 18,
-    price: 899,
-  },
-  {
-    id: 2,
-    operator: "GreenRide Express",
-    busType: "AC Seater",
-    departure: "08:00 PM",
-    arrival: "05:30 AM",
-    route: "Chennai → Bangalore",
-    rating: 4.4,
-    seatsAvailable: 24,
-    price: 749,
-  },
-];
+import { getBuses, type Bus } from "../api/busApi";
 
 function SearchResultsPage() {
+  const [buses, setBuses] = useState<Bus[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
   const [showAcOnly, setShowAcOnly] = useState(false);
   const [showSleeperOnly, setShowSleeperOnly] = useState(false);
   const [showSeaterOnly, setShowSeaterOnly] = useState(false);
+
+  useEffect(() => {
+    const fetchBuses = async () => {
+      try {
+        const data = await getBuses();
+
+        setBuses(data);
+      } catch (error) {
+        console.error("Failed to fetch buses:", error);
+
+        setError("Unable to load buses");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBuses();
+  }, []);
 
   const filteredBuses = buses.filter((bus) => {
     if (showAcOnly && !bus.busType.includes("AC")) {
@@ -61,6 +47,30 @@ function SearchResultsPage() {
 
     return true;
   });
+
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-lg font-medium text-primary-dark">
+          Loading buses... 🚌
+        </p>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <Card className="text-center">
+          <h2 className="text-lg font-bold text-primary-dark">
+            Unable to load buses
+          </h2>
+
+          <p className="mt-2 text-muted">{error}</p>
+        </Card>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-background">
@@ -125,15 +135,15 @@ function SearchResultsPage() {
             {filteredBuses.length > 0 ? (
               filteredBuses.map((bus) => (
                 <BusCard
-                  key={bus.id}
-                  id={bus.id}
+                  key={bus._id}
+                  id={bus._id}
                   operator={bus.operator}
                   busType={bus.busType}
-                  departure={bus.departure}
-                  arrival={bus.arrival}
-                  route={bus.route}
+                  departure={bus.departureTime}
+                  arrival={bus.arrivalTime}
+                  route={`${bus.source} → ${bus.destination}`}
                   rating={bus.rating}
-                  seatsAvailable={bus.seatsAvailable}
+                  seatsAvailable={bus.availableSeats}
                   price={bus.price}
                 />
               ))
