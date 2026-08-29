@@ -5,12 +5,28 @@ import Bus from "../models/Bus.js";
 import { sendSuccess } from "../utils/apiResponse.js";
 
 export const getBuses = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const buses = await Bus.find();
+    const { source, destination, busType } = req.query;
+
+    const filter: Record<string, string> = {};
+
+    if (typeof source === "string" && source.trim()) {
+      filter.source = source.trim();
+    }
+
+    if (typeof destination === "string" && destination.trim()) {
+      filter.destination = destination.trim();
+    }
+
+    if (typeof busType === "string" && busType.trim()) {
+      filter.busType = busType.trim();
+    }
+
+    const buses = await Bus.find(filter);
 
     sendSuccess(res, buses, "Buses fetched successfully");
   } catch (error) {
