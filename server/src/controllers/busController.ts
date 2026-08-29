@@ -87,3 +87,86 @@ export const createBus = async (
     next(error);
   }
 };
+
+export const updateBus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+
+    if (typeof id !== "string") {
+      res.status(400).json({
+        success: false,
+        message: "Invalid bus ID",
+      });
+      return;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid bus ID",
+      });
+      return;
+    }
+
+    const bus = await Bus.findByIdAndUpdate(id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!bus) {
+      res.status(404).json({
+        success: false,
+        message: "Bus not found",
+      });
+      return;
+    }
+
+    sendSuccess(res, bus, "Bus updated successfully");
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteBus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+
+    if (typeof id !== "string") {
+      res.status(400).json({
+        success: false,
+        message: "Invalid bus ID",
+      });
+      return;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid bus ID",
+      });
+      return;
+    }
+
+    const bus = await Bus.findByIdAndDelete(id);
+
+    if (!bus) {
+      res.status(404).json({
+        success: false,
+        message: "Bus not found",
+      });
+      return;
+    }
+
+    sendSuccess(res, bus, "Bus deleted successfully");
+  } catch (error) {
+    next(error);
+  }
+};
