@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   CalendarDays,
   MapPin,
@@ -17,6 +19,29 @@ import FeatureCard from "../components/ui/FeatureCard";
 import AiFeature from "../components/ui/AiFeature";
 
 function HomePage() {
+  const navigate = useNavigate();
+
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [date, setDate] = useState("");
+
+  const handleSearch = () => {
+    if (!from.trim() || !to.trim()) {
+      return;
+    }
+
+    const searchParams = new URLSearchParams({
+      source: from.trim(),
+      destination: to.trim(),
+    });
+
+    if (date) {
+      searchParams.set("date", date);
+    }
+
+    navigate(`/search?${searchParams.toString()}`);
+  };
+
   return (
     <main className="min-h-screen bg-background">
       {/* Hero + Search */}
@@ -71,6 +96,8 @@ function HomePage() {
                     id="from"
                     placeholder="Departure city"
                     className="pl-11"
+                    value={from}
+                    onChange={(event) => setFrom(event.target.value)}
                   />
                 </div>
               </div>
@@ -89,6 +116,8 @@ function HomePage() {
                     id="to"
                     placeholder="Destination city"
                     className="pl-11"
+                    value={to}
+                    onChange={(event) => setTo(event.target.value)}
                   />
                 </div>
               </div>
@@ -103,12 +132,18 @@ function HomePage() {
                     className="absolute left-4 top-1/2 -translate-y-1/2 text-muted"
                   />
 
-                  <Input id="date" type="date" className="pl-11" />
+                  <Input
+                    id="date"
+                    type="date"
+                    className="pl-11"
+                    value={date}
+                    onChange={(event) => setDate(event.target.value)}
+                  />
                 </div>
               </div>
 
               {/* Search Button */}
-              <Button>
+              <Button onClick={handleSearch}>
                 <span className="flex items-center justify-center gap-2">
                   <Search size={18} />
                   Search Buses

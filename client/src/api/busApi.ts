@@ -29,8 +29,16 @@ interface SingleBusResponse {
   data: Bus;
 }
 
-export const getBuses = async (): Promise<Bus[]> => {
-  const response = await api.get<BusResponse>("/buses");
+export interface BusSearchParams {
+  source?: string;
+  destination?: string;
+  busType?: string;
+}
+
+export const getBuses = async (params?: BusSearchParams): Promise<Bus[]> => {
+  const response = await api.get<BusResponse>("/buses", {
+    params,
+  });
 
   return response.data.data;
 };

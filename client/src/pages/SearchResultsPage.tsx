@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import Badge from "../components/ui/Badge";
 import BusCard from "../components/ui/BusCard";
@@ -6,6 +7,12 @@ import Card from "../components/ui/Card";
 import { getBuses, type Bus } from "../api/busApi";
 
 function SearchResultsPage() {
+  const [searchParams] = useSearchParams();
+
+  const source = searchParams.get("source") || "";
+  const destination = searchParams.get("destination") || "";
+  const date = searchParams.get("date") || "";
+
   const [buses, setBuses] = useState<Bus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -16,8 +23,14 @@ function SearchResultsPage() {
 
   useEffect(() => {
     const fetchBuses = async () => {
+      setLoading(true);
+      setError("");
+
       try {
-        const data = await getBuses();
+        const data = await getBuses({
+          source,
+          destination,
+        });
 
         setBuses(data);
       } catch (error) {
@@ -30,7 +43,7 @@ function SearchResultsPage() {
     };
 
     fetchBuses();
-  }, []);
+  }, [source, destination]);
 
   const filteredBuses = buses.filter((bus) => {
     if (showAcOnly && !bus.busType.includes("AC")) {
@@ -48,11 +61,19 @@ function SearchResultsPage() {
     return true;
   });
 
+  const formattedDate = date
+    ? new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : "Any date";
+
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background">
         <p className="text-lg font-medium text-primary-dark">
-          Loading buses... 🚌
+          Searching for buses... 🚌
         </p>
       </main>
     );
@@ -79,11 +100,11 @@ function SearchResultsPage() {
           <Badge variant="primary">Bus search</Badge>
 
           <h1 className="mt-4 text-3xl font-bold text-primary-dark md:text-4xl">
-            Chennai → Bangalore
+            {source || "Any location"} → {destination || "Any destination"}
           </h1>
 
           <p className="mt-2 text-muted">
-            25 August 2026 · {filteredBuses.length} buses available
+            {formattedDate} · {filteredBuses.length} buses available
           </p>
         </div>
 
@@ -153,7 +174,9 @@ function SearchResultsPage() {
                   No buses found
                 </h2>
 
-                <p className="mt-2 text-muted">Try changing your filters.</p>
+                <p className="mt-2 text-muted">
+                  No buses are available for this route.
+                </p>
               </Card>
             )}
           </div>
