@@ -8,6 +8,9 @@ import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Label from "../components/ui/Label";
 
+import { useAppDispatch, useAppSelector } from "../app/hooks";
+import { setPassenger } from "../features/booking/bookingSlice";
+
 type PassengerForm = {
   name: string;
   age: string;
@@ -19,7 +22,13 @@ type PassengerForm = {
 function PassengerDetailsPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [passenger, setPassenger] = useState<PassengerForm>({
+
+  const dispatch = useAppDispatch();
+
+  const { busOperator, source, destination, selectedSeats, totalAmount } =
+    useAppSelector((state) => state.booking);
+
+  const [passenger, setPassengerForm] = useState<PassengerForm>({
     name: "",
     age: "",
     gender: "",
@@ -28,7 +37,7 @@ function PassengerDetailsPage() {
   });
 
   const handleChange = (field: keyof PassengerForm, value: string) => {
-    setPassenger((current) => ({
+    setPassengerForm((current) => ({
       ...current,
       [field]: value,
     }));
@@ -40,6 +49,42 @@ function PassengerDetailsPage() {
     passenger.gender !== "" &&
     passenger.phone.trim() !== "" &&
     passenger.email.trim() !== "";
+
+  const convenienceFee = 49;
+
+  const finalTotal = totalAmount + convenienceFee;
+
+  const handleContinue = () => {
+    if (!isFormValid) {
+      return;
+    }
+
+    dispatch(setPassenger(passenger));
+
+    navigate(`/bus/${id}/payment`);
+  };
+
+  if (selectedSeats.length === 0) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <Card className="text-center">
+          <h2 className="text-xl font-bold text-primary-dark">
+            No seats selected
+          </h2>
+
+          <p className="mt-2 text-muted">
+            Please select your seats before entering passenger details.
+          </p>
+
+          <div className="mt-6">
+            <Button onClick={() => navigate(`/bus/${id}/seats`)}>
+              Select Seats
+            </Button>
+          </div>
+        </Card>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-background">
@@ -67,7 +112,9 @@ function PassengerDetailsPage() {
               <div>
                 <h2 className="font-bold text-primary-dark">Passenger 1</h2>
 
-                <p className="text-sm text-muted">Seat 1A</p>
+                <p className="text-sm text-muted">
+                  Seat {selectedSeats.join(", ")}
+                </p>
               </div>
             </div>
 
@@ -175,7 +222,7 @@ function PassengerDetailsPage() {
                 <span className="text-muted">Bus</span>
 
                 <span className="font-semibold text-primary-dark">
-                  BlueLine Travels
+                  {busOperator}
                 </span>
               </div>
 
@@ -183,27 +230,33 @@ function PassengerDetailsPage() {
                 <span className="text-muted">Route</span>
 
                 <span className="font-semibold text-primary-dark">
-                  Chennai → Bangalore
+                  {source} → {destination}
                 </span>
               </div>
 
               <div className="flex justify-between">
-                <span className="text-muted">Seat</span>
+                <span className="text-muted">Seats</span>
 
-                <span className="font-semibold text-primary-dark">1A</span>
+                <span className="font-semibold text-primary-dark">
+                  {selectedSeats.join(", ")}
+                </span>
               </div>
 
               <div className="border-t border-slate-200 pt-4">
                 <div className="flex justify-between">
                   <span className="text-muted">Seat fare</span>
 
-                  <span className="font-semibold text-primary-dark">₹899</span>
+                  <span className="font-semibold text-primary-dark">
+                    ₹{totalAmount}
+                  </span>
                 </div>
 
                 <div className="mt-3 flex justify-between">
                   <span className="text-muted">Convenience fee</span>
 
-                  <span className="font-semibold text-primary-dark">₹49</span>
+                  <span className="font-semibold text-primary-dark">
+                    ₹{convenienceFee}
+                  </span>
                 </div>
               </div>
 
@@ -211,16 +264,15 @@ function PassengerDetailsPage() {
                 <div className="flex justify-between">
                   <span className="font-semibold text-primary-dark">Total</span>
 
-                  <span className="text-xl font-bold text-primary">₹948</span>
+                  <span className="text-xl font-bold text-primary">
+                    ₹{finalTotal}
+                  </span>
                 </div>
               </div>
             </div>
 
             <div className="mt-7">
-              <Button
-                disabled={!isFormValid}
-                onClick={() => navigate(`/bus/${id}/payment`)}
-              >
+              <Button disabled={!isFormValid} onClick={handleContinue}>
                 Continue to Payment
               </Button>
             </div>

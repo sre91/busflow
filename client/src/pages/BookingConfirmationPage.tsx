@@ -1,10 +1,71 @@
 import { CheckCircle2, Clock3, Download, MapPin, Ticket } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 
+import { useAppSelector } from "../app/hooks";
+
+type Booking = {
+  _id: string;
+  busId: string;
+  passenger: {
+    name: string;
+    age: number;
+    gender: string;
+    phone: string;
+    email: string;
+  };
+  seats: string[];
+  totalAmount: number;
+  paymentMethod: "card" | "upi";
+  paymentStatus: "pending" | "paid" | "failed";
+  bookingStatus: "confirmed" | "cancelled";
+  createdAt: string;
+  updatedAt: string;
+};
+
 function BookingConfirmationPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const booking = location.state?.booking as Booking | undefined;
+
+  const { busOperator, source, destination } = useAppSelector(
+    (state) => state.booking,
+  );
+
+  const convenienceFee = 49;
+
+  if (!booking) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <Card className="text-center">
+          <h2 className="text-xl font-bold text-primary-dark">
+            Booking information unavailable
+          </h2>
+
+          <p className="mt-2 text-muted">
+            We couldn't find the booking details for this page.
+          </p>
+
+          <div className="mt-6">
+            <Button onClick={() => navigate("/")}>Back to Home</Button>
+          </div>
+        </Card>
+      </main>
+    );
+  }
+
+  const seatFare = booking.totalAmount - convenienceFee;
+
+  const bookingDate = new Date(booking.createdAt).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
   return (
     <main className="min-h-screen bg-background">
       <section className="mx-auto max-w-3xl px-6 py-12">
@@ -26,6 +87,7 @@ function BookingConfirmationPage() {
         </div>
 
         <Card className="mt-10 overflow-hidden p-0">
+          {/* Booking Header */}
           <div className="border-b border-slate-200 bg-primary-dark p-6 text-white">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -34,34 +96,36 @@ function BookingConfirmationPage() {
                 <div>
                   <p className="text-sm text-slate-300">Booking ID</p>
 
-                  <p className="font-bold">BF-2026-00128</p>
+                  <p className="font-bold">{booking._id}</p>
                 </div>
               </div>
 
-              <Badge variant="success">Confirmed</Badge>
+              <Badge variant="success">{booking.bookingStatus}</Badge>
             </div>
           </div>
 
           <div className="p-6">
+            {/* Bus */}
             <div>
               <h2 className="text-xl font-bold text-primary-dark">
-                BlueLine Travels
+                {busOperator}
               </h2>
 
-              <p className="mt-1 text-sm text-muted">AC Sleeper</p>
+              <p className="mt-1 text-sm text-muted">Bus booking</p>
             </div>
 
+            {/* Route */}
             <div className="mt-7 grid gap-6 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
               <div>
-                <p className="text-sm text-muted">Departure</p>
+                <p className="text-sm text-muted">From</p>
 
                 <p className="mt-1 text-2xl font-bold text-primary-dark">
-                  10:30 PM
+                  {source}
                 </p>
 
                 <p className="mt-2 flex items-center gap-2 text-sm text-muted">
                   <MapPin size={16} />
-                  Chennai
+                  {source}
                 </p>
               </div>
 
@@ -70,52 +134,109 @@ function BookingConfirmationPage() {
               </div>
 
               <div className="sm:text-right">
-                <p className="text-sm text-muted">Arrival</p>
+                <p className="text-sm text-muted">To</p>
 
                 <p className="mt-1 text-2xl font-bold text-primary-dark">
-                  06:30 AM
+                  {destination}
                 </p>
 
                 <p className="mt-2 flex items-center gap-2 text-sm text-muted sm:justify-end">
                   <MapPin size={16} />
-                  Bangalore
+                  {destination}
                 </p>
               </div>
             </div>
 
+            {/* Booking Details */}
             <div className="mt-8 grid gap-5 border-t border-slate-200 pt-6 sm:grid-cols-3">
               <div>
-                <p className="text-sm text-muted">Travel date</p>
+                <p className="text-sm text-muted">Booking date</p>
 
                 <p className="mt-1 font-semibold text-primary-dark">
-                  25 Aug 2026
+                  {bookingDate}
                 </p>
               </div>
 
               <div>
-                <p className="text-sm text-muted">Seat</p>
+                <p className="text-sm text-muted">Seats</p>
 
-                <p className="mt-1 font-semibold text-primary-dark">1A</p>
+                <p className="mt-1 font-semibold text-primary-dark">
+                  {booking.seats.join(", ")}
+                </p>
               </div>
 
               <div>
                 <p className="text-sm text-muted">Passenger</p>
 
-                <p className="mt-1 font-semibold text-primary-dark">Sree</p>
+                <p className="mt-1 font-semibold text-primary-dark">
+                  {booking.passenger.name}
+                </p>
               </div>
             </div>
 
+            {/* Passenger Contact */}
+            <div className="mt-6 rounded-2xl border border-slate-200 p-5">
+              <h3 className="font-bold text-primary-dark">Passenger details</h3>
+
+              <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+                <div>
+                  <p className="text-muted">Name</p>
+
+                  <p className="mt-1 font-semibold text-primary-dark">
+                    {booking.passenger.name}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-muted">Age</p>
+
+                  <p className="mt-1 font-semibold text-primary-dark">
+                    {booking.passenger.age}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-muted">Phone</p>
+
+                  <p className="mt-1 font-semibold text-primary-dark">
+                    {booking.passenger.phone}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-muted">Email</p>
+
+                  <p className="mt-1 break-all font-semibold text-primary-dark">
+                    {booking.passenger.email}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Summary */}
             <div className="mt-8 rounded-2xl bg-background p-5">
               <div className="flex justify-between text-sm">
                 <span className="text-muted">Seat fare</span>
 
-                <span className="font-semibold text-primary-dark">₹899</span>
+                <span className="font-semibold text-primary-dark">
+                  ₹{seatFare}
+                </span>
               </div>
 
               <div className="mt-3 flex justify-between text-sm">
                 <span className="text-muted">Convenience fee</span>
 
-                <span className="font-semibold text-primary-dark">₹49</span>
+                <span className="font-semibold text-primary-dark">
+                  ₹{convenienceFee}
+                </span>
+              </div>
+
+              <div className="mt-3 flex justify-between text-sm">
+                <span className="text-muted">Payment method</span>
+
+                <span className="font-semibold uppercase text-primary-dark">
+                  {booking.paymentMethod}
+                </span>
               </div>
 
               <div className="mt-4 border-t border-slate-200 pt-4">
@@ -124,13 +245,16 @@ function BookingConfirmationPage() {
                     Total paid
                   </span>
 
-                  <span className="text-xl font-bold text-primary">₹948</span>
+                  <span className="text-xl font-bold text-primary">
+                    ₹{booking.totalAmount}
+                  </span>
                 </div>
               </div>
             </div>
 
+            {/* Download */}
             <div className="mt-7">
-              <Button>
+              <Button onClick={() => window.print()}>
                 <span className="flex items-center justify-center gap-2">
                   <Download size={18} />
                   Download Ticket
@@ -141,8 +265,7 @@ function BookingConfirmationPage() {
         </Card>
 
         <div className="mt-6 text-center text-sm text-muted">
-          A confirmation has been sent to your registered email and phone
-          number.
+          Your booking has been successfully created in BusFlow.
         </div>
       </section>
     </main>

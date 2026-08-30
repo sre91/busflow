@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { CreditCard, LockKeyhole, Smartphone } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Label from "../components/ui/Label";
-import { useNavigate, useParams } from "react-router-dom";
+
+import { useAppSelector } from "../app/hooks";
+import { createBooking } from "../api/bookingApi";
 
 type PaymentMethod = "card" | "upi";
 
@@ -19,8 +22,25 @@ function PaymentPage() {
   const [cvv, setCvv] = useState("");
   const [upiId, setUpiId] = useState("");
 
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+
   const navigate = useNavigate();
   const { id } = useParams();
+
+  const {
+    busId,
+    busOperator,
+    source,
+    destination,
+    selectedSeats,
+    totalAmount,
+    passenger,
+  } = useAppSelector((state) => state.booking);
+
+  const convenienceFee = 49;
+
+  const finalTotal = totalAmount + convenienceFee;
 
   const isCardValid =
     cardNumber.trim() !== "" &&
@@ -31,6 +51,66 @@ function PaymentPage() {
   const isUpiValid = upiId.trim() !== "";
 
   const isPaymentValid = paymentMethod === "card" ? isCardValid : isUpiValid;
+
+  const handlePayment = async () => {
+    if (!isPaymentValid || !passenger || !busId) {
+      return;
+    }
+
+    setIsProcessing(true);
+    setPaymentError("");
+
+    try {
+      const booking = await createBooking({
+        busId,
+        passenger: {
+          name: passenger.name,
+          age: Number(passenger.age),
+          gender: passenger.gender,
+          phone: passenger.phone,
+          email: passenger.email,
+        },
+        seats: selectedSeats,
+        totalAmount: finalTotal,
+        paymentMethod,
+      });
+
+      navigate(`/bus/${id}/confirmation`, {
+        state: {
+          booking,
+        },
+      });
+    } catch (error) {
+      console.error("Booking failed:", error);
+
+      setPaymentError("Unable to complete the booking. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (selectedSeats.length === 0 || !passenger || !busId) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <Card className="text-center">
+          <h2 className="text-xl font-bold text-primary-dark">
+            Booking information missing
+          </h2>
+
+          <p className="mt-2 text-muted">
+            Please select your seats and enter passenger details before making
+            payment.
+          </p>
+
+          <div className="mt-6">
+            <Button onClick={() => navigate(`/bus/${id}/seats`)}>
+              Start Booking
+            </Button>
+          </div>
+        </Card>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-background">
@@ -162,12 +242,18 @@ function PaymentPage() {
               </p>
             </div>
 
+            {paymentError && (
+              <div className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-600">
+                {paymentError}
+              </div>
+            )}
+
             <div className="mt-7">
               <Button
-                disabled={!isPaymentValid}
-                onClick={() => navigate(`/bus/${id}/confirmation`)}
+                disabled={!isPaymentValid || isProcessing}
+                onClick={handlePayment}
               >
-                Pay ₹948
+                {isProcessing ? "Processing..." : `Pay ₹${finalTotal}`}
               </Button>
             </div>
           </Card>
@@ -183,7 +269,7 @@ function PaymentPage() {
                 <span className="text-muted">Bus</span>
 
                 <span className="font-semibold text-primary-dark">
-                  BlueLine Travels
+                  {busOperator}
                 </span>
               </div>
 
@@ -191,27 +277,33 @@ function PaymentPage() {
                 <span className="text-muted">Route</span>
 
                 <span className="font-semibold text-primary-dark">
-                  Chennai → Bangalore
+                  {source} → {destination}
                 </span>
               </div>
 
-              <div className="flex justify-between">
-                <span className="text-muted">Seat</span>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted">Seats</span>
 
-                <span className="font-semibold text-primary-dark">1A</span>
+                <span className="text-right font-semibold text-primary-dark">
+                  {selectedSeats.join(", ")}
+                </span>
               </div>
 
               <div className="border-t border-slate-200 pt-4">
                 <div className="flex justify-between">
                   <span className="text-muted">Seat fare</span>
 
-                  <span className="font-semibold text-primary-dark">₹899</span>
+                  <span className="font-semibold text-primary-dark">
+                    ₹{totalAmount}
+                  </span>
                 </div>
 
                 <div className="mt-3 flex justify-between">
                   <span className="text-muted">Convenience fee</span>
 
-                  <span className="font-semibold text-primary-dark">₹49</span>
+                  <span className="font-semibold text-primary-dark">
+                    ₹{convenienceFee}
+                  </span>
                 </div>
               </div>
 
@@ -219,7 +311,9 @@ function PaymentPage() {
                 <div className="flex justify-between">
                   <span className="font-semibold text-primary-dark">Total</span>
 
-                  <span className="text-xl font-bold text-primary">₹948</span>
+                  <span className="text-xl font-bold text-primary">
+                    ₹{finalTotal}
+                  </span>
                 </div>
               </div>
             </div>

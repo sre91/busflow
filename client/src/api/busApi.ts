@@ -48,3 +48,26 @@ export const getBusById = async (id: string): Promise<Bus> => {
 
   return response.data.data;
 };
+
+export interface Seat {
+  _id: string;
+  busId: string;
+  seatNumber: string;
+  seatType: "seater" | "sleeper";
+  status: "available" | "booked";
+  price: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface SeatResponse {
+  success: boolean;
+  message: string;
+  data: Seat[];
+}
+
+export const getSeatsByBus = async (busId: string): Promise<Seat[]> => {
+  const response = await api.get<SeatResponse>(`/seats/${busId}`);
+
+  return response.data.data;
+};

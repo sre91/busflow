@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Armchair, Check, UserRound } from "lucide-react";
 
@@ -6,45 +6,64 @@ import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 
-type SeatStatus = "available" | "booked";
+import { getBusById, getSeatsByBus, type Bus, type Seat } from "../api/busApi";
 
-type Seat = {
-  id: string;
-  price: number;
-  status: SeatStatus;
-};
+import { useAppDispatch } from "../app/hooks";
 
-const seats: Seat[] = [
-  { id: "1A", price: 899, status: "available" },
-  { id: "1B", price: 899, status: "available" },
-  { id: "1C", price: 899, status: "booked" },
-  { id: "1D", price: 899, status: "available" },
-
-  { id: "2A", price: 899, status: "available" },
-  { id: "2B", price: 899, status: "booked" },
-  { id: "2C", price: 899, status: "available" },
-  { id: "2D", price: 899, status: "available" },
-
-  { id: "3A", price: 899, status: "available" },
-  { id: "3B", price: 899, status: "available" },
-  { id: "3C", price: 899, status: "available" },
-  { id: "3D", price: 899, status: "booked" },
-
-  { id: "4A", price: 899, status: "available" },
-  { id: "4B", price: 899, status: "available" },
-  { id: "4C", price: 899, status: "available" },
-  { id: "4D", price: 899, status: "available" },
-
-  { id: "5A", price: 899, status: "booked" },
-  { id: "5B", price: 899, status: "available" },
-  { id: "5C", price: 899, status: "available" },
-  { id: "5D", price: 899, status: "available" },
-];
+import {
+  setBookingBus,
+  setSelectedSeats as saveSelectedSeats,
+} from "../features/booking/bookingSlice";
 
 function SeatSelectionPage() {
+  const [bus, setBus] = useState<Bus | null>(null);
+  const [seats, setSeats] = useState<Seat[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
   const navigate = useNavigate();
   const { id } = useParams();
+
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    const fetchSeatData = async () => {
+      if (!id) {
+        setError("Bus ID is missing");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const [busData, seatData] = await Promise.all([
+          getBusById(id),
+          getSeatsByBus(id),
+        ]);
+
+        setBus(busData);
+        setSeats(seatData);
+
+        dispatch(
+          setBookingBus({
+            busId: busData._id,
+            busOperator: busData.operator,
+            source: busData.source,
+            destination: busData.destination,
+          }),
+        );
+      } catch (error) {
+        console.error("Failed to fetch seat data:", error);
+
+        setError("Unable to load seat information");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSeatData();
+  }, [id, dispatch]);
 
   const toggleSeat = (seat: Seat) => {
     if (seat.status === "booked") {
@@ -52,15 +71,70 @@ function SeatSelectionPage() {
     }
 
     setSelectedSeats((currentSeats) => {
-      if (currentSeats.includes(seat.id)) {
-        return currentSeats.filter((selectedSeat) => selectedSeat !== seat.id);
+      let updatedSeats: string[];
+
+      if (currentSeats.includes(seat.seatNumber)) {
+        updatedSeats = currentSeats.filter(
+          (selectedSeat) => selectedSeat !== seat.seatNumber,
+        );
+      } else {
+        updatedSeats = [...currentSeats, seat.seatNumber];
       }
 
-      return [...currentSeats, seat.id];
+      const totalAmount = updatedSeats.reduce((total, seatNumber) => {
+        const selectedSeat = seats.find(
+          (currentSeat) => currentSeat.seatNumber === seatNumber,
+        );
+
+        return total + (selectedSeat?.price ?? 0);
+      }, 0);
+
+      dispatch(
+        saveSelectedSeats({
+          seats: updatedSeats,
+          totalAmount,
+        }),
+      );
+
+      return updatedSeats;
     });
   };
 
-  const totalPrice = selectedSeats.length * 899;
+  const totalPrice = selectedSeats.reduce((total, seatNumber) => {
+    const seat = seats.find(
+      (currentSeat) => currentSeat.seatNumber === seatNumber,
+    );
+
+    return total + (seat?.price ?? 0);
+  }, 0);
+
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-lg font-medium text-primary-dark">
+          Loading seats... 💺
+        </p>
+      </main>
+    );
+  }
+
+  if (error || !bus) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <Card className="text-center">
+          <h2 className="text-xl font-bold text-primary-dark">
+            Unable to load seat information
+          </h2>
+
+          <p className="mt-2 text-muted">{error || "Bus not found"}</p>
+
+          <div className="mt-6">
+            <Button onClick={() => navigate("/search")}>Back to buses</Button>
+          </div>
+        </Card>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-background">
@@ -73,7 +147,7 @@ function SeatSelectionPage() {
           </h1>
 
           <p className="mt-2 text-muted">
-            BlueLine Travels · Chennai → Bangalore
+            {bus.operator} · {bus.source} → {bus.destination}
           </p>
         </div>
 
@@ -94,67 +168,75 @@ function SeatSelectionPage() {
                 </div>
 
                 <div className="space-y-4">
-                  {Array.from({ length: 5 }, (_, rowIndex) => {
-                    const rowNumber = rowIndex + 1;
+                  {Array.from(
+                    {
+                      length: Math.ceil(seats.length / 4),
+                    },
+                    (_, rowIndex) => {
+                      const rowNumber = rowIndex + 1;
 
-                    const rowSeats = seats.filter((seat) =>
-                      seat.id.startsWith(`${rowNumber}`),
-                    );
+                      const rowSeats = seats.slice(
+                        rowIndex * 4,
+                        rowIndex * 4 + 4,
+                      );
 
-                    return (
-                      <div
-                        key={rowNumber}
-                        className="grid grid-cols-[1fr_1fr_32px_1fr_1fr] gap-2"
-                      >
-                        {rowSeats.map((seat, index) => {
-                          const isSelected = selectedSeats.includes(seat.id);
+                      return (
+                        <div
+                          key={rowNumber}
+                          className="grid grid-cols-[1fr_1fr_32px_1fr_1fr] gap-2"
+                        >
+                          {rowSeats.map((seat, index) => {
+                            const isSelected = selectedSeats.includes(
+                              seat.seatNumber,
+                            );
 
-                          return (
-                            <div
-                              key={seat.id}
-                              className={
-                                index === 2 ? "col-start-4" : undefined
-                              }
-                            >
-                              <button
-                                type="button"
-                                disabled={seat.status === "booked"}
-                                onClick={() => toggleSeat(seat)}
-                                className={`
-                                  flex
-                                  w-full
-                                  flex-col
-                                  items-center
-                                  justify-center
-                                  rounded-xl
-                                  border
-                                  p-2
-                                  transition
-                                  ${
-                                    seat.status === "booked"
-                                      ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-                                      : isSelected
-                                        ? "border-primary bg-primary text-white shadow-md"
-                                        : "border-slate-200 bg-surface text-primary-dark hover:border-primary hover:bg-primary/5"
-                                  }
-                                `}
+                            return (
+                              <div
+                                key={seat._id}
+                                className={
+                                  index === 2 ? "col-start-4" : undefined
+                                }
                               >
-                                {isSelected ? (
-                                  <Check size={18} />
-                                ) : (
-                                  <Armchair size={18} />
-                                )}
+                                <button
+                                  type="button"
+                                  disabled={seat.status === "booked"}
+                                  onClick={() => toggleSeat(seat)}
+                                  className={`
+                                    flex
+                                    w-full
+                                    flex-col
+                                    items-center
+                                    justify-center
+                                    rounded-xl
+                                    border
+                                    p-2
+                                    transition
+                                    ${
+                                      seat.status === "booked"
+                                        ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                                        : isSelected
+                                          ? "border-primary bg-primary text-white shadow-md"
+                                          : "border-slate-200 bg-surface text-primary-dark hover:border-primary hover:bg-primary/5"
+                                    }
+                                  `}
+                                >
+                                  {isSelected ? (
+                                    <Check size={18} />
+                                  ) : (
+                                    <Armchair size={18} />
+                                  )}
 
-                                <span className="mt-1 text-xs font-semibold">
-                                  {seat.id}
-                                </span>
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
+                                  <span className="mt-1 text-xs font-semibold">
+                                    {seat.seatNumber}
+                                  </span>
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    },
+                  )}
                 </div>
               </div>
 
@@ -189,7 +271,7 @@ function SeatSelectionPage() {
                 <span className="text-muted">Bus</span>
 
                 <span className="font-semibold text-primary-dark">
-                  BlueLine Travels
+                  {bus.operator}
                 </span>
               </div>
 
