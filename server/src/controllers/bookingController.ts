@@ -11,6 +11,8 @@ export const createBooking = async (
   res: Response,
   next: NextFunction,
 ) => {
+  const session = await mongoose.startSession();
+
   try {
     const authReq = req as AuthRequest;
 
@@ -44,18 +46,39 @@ export const createBooking = async (
       return;
     }
 
+    const parsedJourneyDate = new Date(journeyDate);
+
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+
+    parsedJourneyDate.setHours(0, 0, 0, 0);
+
+    if (parsedJourneyDate < today) {
+      res.status(400).json({
+        success: false,
+        message: "Journey date cannot be in the past",
+      });
+      return;
+    }
+
     // Validate passenger details
     if (
       !passenger ||
-      !passenger.name ||
-      !passenger.age ||
-      !passenger.gender ||
-      !passenger.phone ||
-      !passenger.email
+      typeof passenger.name !== "string" ||
+      passenger.name.trim().length < 2 ||
+      typeof passenger.age !== "number" ||
+      passenger.age < 1 ||
+      passenger.age > 120 ||
+      !["male", "female", "other"].includes(passenger.gender) ||
+      typeof passenger.phone !== "string" ||
+      !/^\d{10}$/.test(passenger.phone.trim()) ||
+      typeof passenger.email !== "string" ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(passenger.email.trim())
     ) {
       res.status(400).json({
         success: false,
-        message: "Complete passenger details are required",
+        message: "Invalid passenger details",
       });
       return;
     }
@@ -69,7 +92,7 @@ export const createBooking = async (
       return;
     }
 
-    // Prevent duplicate seats in the same request
+    // Prevent duplicate seats
     const uniqueSeats = [...new Set(seats)];
 
     if (uniqueSeats.length !== seats.length) {
@@ -89,10 +112,18 @@ export const createBooking = async (
       return;
     }
 
+    /*
+     * Start transaction
+     */
+
+    session.startTransaction();
+
     // Find bus
-    const bus = await Bus.findById(busId);
+    const bus = await Bus.findById(busId).session(session);
 
     if (!bus) {
+      await session.abortTransaction();
+
       res.status(404).json({
         success: false,
         message: "Bus not found",
@@ -100,14 +131,18 @@ export const createBooking = async (
       return;
     }
 
-    // Find selected seats belonging to this bus
+    // Find selected seats
     const seatDocuments = await Seat.find({
       busId,
-      seatNumber: { $in: uniqueSeats },
-    });
+      seatNumber: {
+        $in: uniqueSeats,
+      },
+    }).session(session);
 
-    // Make sure every requested seat exists
+    // Make sure every seat exists
     if (seatDocuments.length !== uniqueSeats.length) {
+      await session.abortTransaction();
+
       res.status(400).json({
         success: false,
         message: "One or more selected seats do not exist",
@@ -115,19 +150,38 @@ export const createBooking = async (
       return;
     }
 
-    // Check whether selected seats are already booked
-    // for this bus and journey date
+    // Check physical seat status
+    const alreadyBookedSeats = seatDocuments.filter(
+      (seat) => seat.status === "booked",
+    );
+
+    if (alreadyBookedSeats.length > 0) {
+      await session.abortTransaction();
+
+      res.status(409).json({
+        success: false,
+        message: "One or more selected seats are already booked",
+        seats: alreadyBookedSeats.map((seat) => seat.seatNumber),
+      });
+      return;
+    }
+
+    // Check booking conflicts for this journey date
     const existingBookings = await Booking.find({
       busId,
-      journeyDate: new Date(journeyDate),
+      journeyDate: parsedJourneyDate,
       bookingStatus: "confirmed",
-      seats: { $in: uniqueSeats },
-    });
+      seats: {
+        $in: uniqueSeats,
+      },
+    }).session(session);
 
     if (existingBookings.length > 0) {
       const bookedSeats = existingBookings.flatMap((booking) =>
         booking.seats.filter((seat) => uniqueSeats.includes(seat)),
       );
+
+      await session.abortTransaction();
 
       res.status(409).json({
         success: false,
@@ -137,30 +191,74 @@ export const createBooking = async (
       return;
     }
 
-    // Calculate amount on the backend
+    // Make sure bus has enough available seats
+    if (bus.availableSeats < uniqueSeats.length) {
+      await session.abortTransaction();
+
+      res.status(409).json({
+        success: false,
+        message: "Not enough seats are available",
+      });
+      return;
+    }
+
+    // Calculate total on backend
     const convenienceFee = 49;
 
     const totalAmount = bus.price * uniqueSeats.length + convenienceFee;
 
-    // Create booking
-    const booking = await Booking.create({
-      userId,
-      busId,
-      journeyDate: new Date(journeyDate),
-      passenger,
-      seats: uniqueSeats,
-      totalAmount,
-      paymentMethod,
-      paymentStatus: "paid",
-      bookingStatus: "confirmed",
-    });
+    // Create booking inside transaction
+    const createdBookings = await Booking.create(
+      [
+        {
+          userId,
+          busId,
+          journeyDate: parsedJourneyDate,
+          passenger,
+          seats: uniqueSeats,
+          totalAmount,
+          paymentMethod,
+          paymentStatus: "paid",
+          bookingStatus: "confirmed",
+        },
+      ],
+      {
+        session,
+      },
+    );
 
-    // Update bus available seat count
+    const booking = createdBookings[0];
+
+    // Mark seats as booked
+    await Seat.updateMany(
+      {
+        busId,
+        seatNumber: {
+          $in: uniqueSeats,
+        },
+        status: "available",
+      },
+      {
+        $set: {
+          status: "booked",
+        },
+      },
+      {
+        session,
+      },
+    );
+
+    // Decrease bus available seats
     bus.availableSeats = Math.max(0, bus.availableSeats - uniqueSeats.length);
 
-    await bus.save();
+    await bus.save({
+      session,
+    });
 
-    // Populate bus information
+    // Commit transaction
+    await session.commitTransaction();
+
+    // Populate after transaction completes
     const populatedBooking = await Booking.findById(booking._id).populate(
       "busId",
       "operator source destination busType departureTime arrivalTime",
@@ -172,6 +270,10 @@ export const createBooking = async (
       data: populatedBooking,
     });
   } catch (error: any) {
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+
     // MongoDB duplicate-key error
     if (error?.code === 11000) {
       res.status(409).json({
@@ -182,6 +284,8 @@ export const createBooking = async (
     }
 
     next(error);
+  } finally {
+    await session.endSession();
   }
 };
 
@@ -283,10 +387,13 @@ export const cancelBooking = async (
   res: Response,
   next: NextFunction,
 ) => {
+  const session = await mongoose.startSession();
+
   try {
     const authReq = req as AuthRequest;
 
     const userId = authReq.user?.userId;
+
     const id = req.params.id as string;
 
     // Check authentication
@@ -307,13 +414,21 @@ export const cancelBooking = async (
       return;
     }
 
-    // Find booking belonging to the logged-in user
+    /*
+     * Start transaction
+     */
+
+    session.startTransaction();
+
+    // Find booking belonging to user
     const booking = await Booking.findOne({
       _id: id,
       userId,
-    });
+    }).session(session);
 
     if (!booking) {
+      await session.abortTransaction();
+
       res.status(404).json({
         success: false,
         message: "Booking not found",
@@ -321,8 +436,10 @@ export const cancelBooking = async (
       return;
     }
 
-    // Prevent cancelling an already cancelled booking
+    // Prevent duplicate cancellation
     if (booking.bookingStatus === "cancelled") {
+      await session.abortTransaction();
+
       res.status(400).json({
         success: false,
         message: "Booking is already cancelled",
@@ -330,26 +447,70 @@ export const cancelBooking = async (
       return;
     }
 
+    // Prevent cancellation after journey date
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+
+    const journeyDate = new Date(booking.journeyDate);
+
+    journeyDate.setHours(0, 0, 0, 0);
+
+    if (journeyDate < today) {
+      await session.abortTransaction();
+
+      res.status(400).json({
+        success: false,
+        message:
+          "This booking can no longer be cancelled because the journey date has passed",
+      });
+      return;
+    }
+
     // Mark booking as cancelled
     booking.bookingStatus = "cancelled";
 
-    await booking.save();
+    await booking.save({
+      session,
+    });
 
-    // Restore available seats on the bus
-    const bus = await Bus.findById(booking.busId);
+    // Restore bus seats
+    const bus = await Bus.findById(booking.busId).session(session);
 
     if (bus) {
       bus.availableSeats += booking.seats.length;
 
-      // Never allow available seats to exceed total seats
       if (bus.availableSeats > bus.totalSeats) {
         bus.availableSeats = bus.totalSeats;
       }
 
-      await bus.save();
+      await bus.save({
+        session,
+      });
     }
 
-    // Fetch updated booking with bus information
+    // Restore physical seat status
+    await Seat.updateMany(
+      {
+        busId: booking.busId,
+        seatNumber: {
+          $in: booking.seats,
+        },
+      },
+      {
+        $set: {
+          status: "available",
+        },
+      },
+      {
+        session,
+      },
+    );
+
+    // Commit transaction
+    await session.commitTransaction();
+
+    // Fetch updated booking
     const updatedBooking = await Booking.findById(booking._id).populate(
       "busId",
       "operator source destination busType departureTime arrivalTime",
@@ -361,6 +522,12 @@ export const cancelBooking = async (
       data: updatedBooking,
     });
   } catch (error) {
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+
     next(error);
+  } finally {
+    await session.endSession();
   }
 };

@@ -8,36 +8,57 @@ type ApiErrorResponse = {
 
 export const getApiErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError<ApiErrorResponse>(error)) {
+    const status = error.response?.status;
+
     const message = error.response?.data?.message;
 
-    if (message) {
-      return message;
-    }
+    const seats = error.response?.data?.seats;
 
-    if (error.response?.status === 409) {
-      const seats = error.response.data?.seats;
-
+    // Seat conflict
+    if (status === 409) {
       if (seats && seats.length > 0) {
-        return `Seat(s) ${seats.join(", ")} are already booked.`;
+        return `Seat(s) ${seats.join(
+          ", ",
+        )} are already booked. Please select another seat.`;
       }
 
-      return "One or more selected seats are already booked.";
+      return message || "One or more selected seats are already booked.";
     }
 
-    if (error.response?.status === 404) {
-      return "The requested resource was not found.";
+    // Authentication
+    if (status === 401) {
+      return message || "Please login to continue.";
     }
 
-    if (error.response?.status === 400) {
-      return "Some booking information is invalid.";
+    // Validation
+    if (status === 400) {
+      return message || "Some booking information is invalid.";
     }
 
-    if (error.response?.status === 500) {
-      return "Server error. Please try again later.";
+    // Not found
+    if (status === 404) {
+      return message || "The requested resource was not found.";
+    }
+
+    // Server error
+    if (status === 500) {
+      return message || "Server error. Please try again later.";
+    }
+
+    // Any other API error
+    if (message) {
+      return message;
     }
 
     return "Unable to complete the request.";
   }
 
   return "Something went wrong. Please try again.";
+};
+
+export const isSeatConflictError = (error: unknown): boolean => {
+  return (
+    axios.isAxiosError<ApiErrorResponse>(error) &&
+    error.response?.status === 409
+  );
 };

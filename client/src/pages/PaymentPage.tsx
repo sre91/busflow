@@ -2,7 +2,7 @@ import { useState } from "react";
 import { CreditCard, LockKeyhole, Smartphone } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { getApiErrorMessage } from "../api/apiError";
+import { getApiErrorMessage, isSeatConflictError } from "../api/apiError";
 
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
@@ -48,15 +48,34 @@ function PaymentPage() {
 
   const finalTotal = totalAmount + convenienceFee;
 
-  const isCardValid =
-    cardNumber.trim() !== "" &&
-    cardName.trim() !== "" &&
-    expiry.trim() !== "" &&
-    cvv.trim() !== "";
+  /*
+   * Card validation
+   */
 
-  const isUpiValid = upiId.trim() !== "";
+  const normalizedCardNumber = cardNumber.replace(/\s/g, "");
+
+  const cardNumberValid = /^\d{16}$/.test(normalizedCardNumber);
+
+  const cardNameValid = cardName.trim().length >= 2;
+
+  const expiryValid = /^(0[1-9]|1[0-2])\/\d{2}$/.test(expiry.trim());
+
+  const cvvValid = /^\d{3}$/.test(cvv.trim());
+
+  const isCardValid =
+    cardNumberValid && cardNameValid && expiryValid && cvvValid;
+
+  /*
+   * UPI validation
+   */
+
+  const isUpiValid = /^[a-zA-Z0-9._-]+@[a-zA-Z]{2,}$/.test(upiId.trim());
 
   const isPaymentValid = paymentMethod === "card" ? isCardValid : isUpiValid;
+
+  /*
+   * Payment / booking
+   */
 
   const handlePayment = async () => {
     if (
@@ -99,11 +118,34 @@ function PaymentPage() {
     } catch (error) {
       console.error("Booking failed:", error);
 
-      setPaymentError(getApiErrorMessage(error));
+      const message = getApiErrorMessage(error);
+
+      setPaymentError(message);
+
+      /*
+       * If another user booked one of our
+       * selected seats, return to the seat
+       * selection page after showing the
+       * conflict message.
+       */
+
+      if (isSeatConflictError(error)) {
+        setTimeout(() => {
+          navigate(
+            `/bus/${id}/seats?journeyDate=${encodeURIComponent(
+              urlJourneyDate,
+            )}`,
+          );
+        }, 2000);
+      }
     } finally {
       setIsProcessing(false);
     }
   };
+
+  /*
+   * Missing booking information
+   */
 
   if (selectedSeats.length === 0 || !passenger || !busId || !urlJourneyDate) {
     return (
@@ -123,7 +165,7 @@ function PaymentPage() {
               onClick={() =>
                 navigate(
                   `/bus/${id}/seats?journeyDate=${encodeURIComponent(
-                    urlJourneyDate,
+                    urlJourneyDate || "",
                   )}`,
                 )
               }
@@ -153,15 +195,21 @@ function PaymentPage() {
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
           {/* Payment */}
+
           <Card>
             <h2 className="text-xl font-bold text-primary-dark">
               Payment method
             </h2>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {/* Card */}
+
               <button
                 type="button"
-                onClick={() => setPaymentMethod("card")}
+                onClick={() => {
+                  setPaymentMethod("card");
+                  setPaymentError("");
+                }}
                 className={`rounded-2xl border p-5 text-left transition ${
                   paymentMethod === "card"
                     ? "border-primary bg-primary/5"
@@ -179,9 +227,14 @@ function PaymentPage() {
                 </p>
               </button>
 
+              {/* UPI */}
+
               <button
                 type="button"
-                onClick={() => setPaymentMethod("upi")}
+                onClick={() => {
+                  setPaymentMethod("upi");
+                  setPaymentError("");
+                }}
                 className={`rounded-2xl border p-5 text-left transition ${
                   paymentMethod === "upi"
                     ? "border-primary bg-primary/5"
@@ -196,6 +249,8 @@ function PaymentPage() {
               </button>
             </div>
 
+            {/* Card form */}
+
             {paymentMethod === "card" ? (
               <div className="mt-8 space-y-5">
                 <div>
@@ -206,7 +261,14 @@ function PaymentPage() {
                     value={cardNumber}
                     onChange={(event) => setCardNumber(event.target.value)}
                     placeholder="1234 5678 9012 3456"
+                    inputMode="numeric"
                   />
+
+                  {cardNumber.length > 0 && !cardNumberValid && (
+                    <p className="mt-2 text-sm text-red-500">
+                      Enter a valid 16-digit card number.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -218,6 +280,12 @@ function PaymentPage() {
                     onChange={(event) => setCardName(event.target.value)}
                     placeholder="Enter cardholder name"
                   />
+
+                  {cardName.length > 0 && !cardNameValid && (
+                    <p className="mt-2 text-sm text-red-500">
+                      Enter the cardholder name.
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid gap-5 sm:grid-cols-2">
@@ -228,8 +296,15 @@ function PaymentPage() {
                       id="expiry"
                       value={expiry}
                       onChange={(event) => setExpiry(event.target.value)}
-                      placeholder="MM / YY"
+                      placeholder="MM/YY"
+                      inputMode="numeric"
                     />
+
+                    {expiry.length > 0 && !expiryValid && (
+                      <p className="mt-2 text-sm text-red-500">
+                        Use MM/YY format.
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -241,11 +316,21 @@ function PaymentPage() {
                       value={cvv}
                       onChange={(event) => setCvv(event.target.value)}
                       placeholder="•••"
+                      inputMode="numeric"
+                      maxLength={3}
                     />
+
+                    {cvv.length > 0 && !cvvValid && (
+                      <p className="mt-2 text-sm text-red-500">
+                        CVV must contain 3 digits.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
             ) : (
+              /* UPI form */
+
               <div className="mt-8">
                 <Label htmlFor="upiId">UPI ID</Label>
 
@@ -255,8 +340,16 @@ function PaymentPage() {
                   onChange={(event) => setUpiId(event.target.value)}
                   placeholder="example@upi"
                 />
+
+                {upiId.length > 0 && !isUpiValid && (
+                  <p className="mt-2 text-sm text-red-500">
+                    Enter a valid UPI ID.
+                  </p>
+                )}
               </div>
             )}
+
+            {/* Security */}
 
             <div className="mt-8 flex items-center gap-3 rounded-xl bg-background p-4">
               <LockKeyhole size={20} className="text-success" />
@@ -266,9 +359,13 @@ function PaymentPage() {
               </p>
             </div>
 
+            {/* API error */}
+
             {paymentError && (
               <div className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-600">
                 {paymentError}
+
+                {isSeatConflictError(paymentError) && null}
               </div>
             )}
 
@@ -283,6 +380,7 @@ function PaymentPage() {
           </Card>
 
           {/* Booking Summary */}
+
           <Card className="h-fit lg:sticky lg:top-24">
             <h2 className="text-xl font-bold text-primary-dark">
               Booking summary
@@ -309,7 +407,11 @@ function PaymentPage() {
                 <span className="text-muted">Journey date</span>
 
                 <span className="font-semibold text-primary-dark">
-                  {urlJourneyDate}
+                  {new Date(urlJourneyDate).toLocaleDateString("en-IN", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })}
                 </span>
               </div>
 

@@ -9,43 +9,7 @@ import Card from "../components/ui/Card";
 import { useAppDispatch } from "../app/hooks";
 import { clearBooking } from "../features/booking/bookingSlice";
 
-type Booking = {
-  _id: string;
-
-  busId: {
-    _id: string;
-    operator: string;
-    source: string;
-    destination: string;
-    busType: string;
-    departureTime?: string;
-    arrivalTime?: string;
-  };
-
-  journeyDate: string;
-
-  passenger: {
-    name: string;
-    age: number;
-    gender: string;
-    phone: string;
-    email: string;
-  };
-
-  seats: string[];
-
-  totalAmount: number;
-
-  paymentMethod: "card" | "upi";
-
-  paymentStatus: "pending" | "paid" | "failed";
-
-  bookingStatus: "confirmed" | "cancelled";
-
-  createdAt: string;
-
-  updatedAt: string;
-};
+import type { Booking } from "../api/bookingApi";
 
 function BookingConfirmationPage() {
   const location = useLocation();
@@ -82,9 +46,19 @@ function BookingConfirmationPage() {
 
   const convenienceFee = 49;
 
-  const seatFare = Math.max(0, booking.totalAmount - convenienceFee);
+  const seatFare = booking.totalAmount - convenienceFee;
 
   const journeyDate = new Date(booking.journeyDate).toLocaleDateString(
+    "en-IN",
+    {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    },
+  );
+
+  const bookingCreatedDate = new Date(booking.createdAt).toLocaleDateString(
     "en-IN",
     {
       day: "2-digit",
@@ -93,21 +67,19 @@ function BookingConfirmationPage() {
     },
   );
 
-  const bookingDate = new Date(booking.createdAt).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-
   return (
     <main className="min-h-screen bg-background">
       <section className="mx-auto max-w-3xl px-6 py-12">
+        {/* Success Header */}
+
         <div className="text-center">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-success/10 text-success">
             <CheckCircle2 size={42} />
           </div>
 
-          <Badge variant="success">Booking confirmed</Badge>
+          <div className="mt-5">
+            <Badge variant="success">Booking confirmed</Badge>
+          </div>
 
           <h1 className="mt-5 text-3xl font-bold text-primary-dark md:text-4xl">
             Your trip is booked! 🎉
@@ -121,6 +93,7 @@ function BookingConfirmationPage() {
 
         <Card className="mt-10 overflow-hidden p-0">
           {/* Booking Header */}
+
           <div className="border-b border-slate-200 bg-primary-dark p-6 text-white">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -129,7 +102,7 @@ function BookingConfirmationPage() {
                 <div>
                   <p className="text-sm text-slate-300">Booking ID</p>
 
-                  <p className="font-bold">{booking._id}</p>
+                  <p className="break-all font-bold">{booking._id}</p>
                 </div>
               </div>
 
@@ -139,6 +112,7 @@ function BookingConfirmationPage() {
 
           <div className="p-6">
             {/* Bus */}
+
             <div>
               <h2 className="text-xl font-bold text-primary-dark">
                 {booking.busId.operator}
@@ -147,7 +121,18 @@ function BookingConfirmationPage() {
               <p className="mt-1 text-sm text-muted">{booking.busId.busType}</p>
             </div>
 
+            {/* Journey Date */}
+
+            <div className="mt-6 rounded-2xl bg-primary/5 p-5">
+              <p className="text-sm font-medium text-muted">Journey date</p>
+
+              <p className="mt-1 text-xl font-bold text-primary-dark">
+                {journeyDate}
+              </p>
+            </div>
+
             {/* Route */}
+
             <div className="mt-7 grid gap-6 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
               <div>
                 <p className="text-sm text-muted">Departure</p>
@@ -158,6 +143,7 @@ function BookingConfirmationPage() {
 
                 <p className="mt-2 flex items-center gap-2 text-sm text-muted">
                   <MapPin size={16} />
+
                   {booking.busId.source}
                 </p>
               </div>
@@ -175,26 +161,20 @@ function BookingConfirmationPage() {
 
                 <p className="mt-2 flex items-center gap-2 text-sm text-muted sm:justify-end">
                   <MapPin size={16} />
+
                   {booking.busId.destination}
                 </p>
               </div>
             </div>
 
             {/* Booking Details */}
-            <div className="mt-8 grid gap-5 border-t border-slate-200 pt-6 sm:grid-cols-4">
+
+            <div className="mt-8 grid gap-5 border-t border-slate-200 pt-6 sm:grid-cols-3">
               <div>
                 <p className="text-sm text-muted">Journey date</p>
 
                 <p className="mt-1 font-semibold text-primary-dark">
                   {journeyDate}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm text-muted">Booking date</p>
-
-                <p className="mt-1 font-semibold text-primary-dark">
-                  {bookingDate}
                 </p>
               </div>
 
@@ -216,6 +196,7 @@ function BookingConfirmationPage() {
             </div>
 
             {/* Passenger Details */}
+
             <div className="mt-6 rounded-2xl border border-slate-200 p-5">
               <h3 className="font-bold text-primary-dark">Passenger details</h3>
 
@@ -255,6 +236,7 @@ function BookingConfirmationPage() {
             </div>
 
             {/* Payment Summary */}
+
             <div className="mt-8 rounded-2xl bg-background p-5">
               <div className="flex justify-between text-sm">
                 <span className="text-muted">Seat fare</span>
@@ -280,6 +262,14 @@ function BookingConfirmationPage() {
                 </span>
               </div>
 
+              <div className="mt-3 flex justify-between text-sm">
+                <span className="text-muted">Payment status</span>
+
+                <span className="font-semibold capitalize text-success">
+                  {booking.paymentStatus}
+                </span>
+              </div>
+
               <div className="mt-4 border-t border-slate-200 pt-4">
                 <div className="flex justify-between">
                   <span className="font-bold text-primary-dark">
@@ -293,7 +283,14 @@ function BookingConfirmationPage() {
               </div>
             </div>
 
+            {/* Booking Created */}
+
+            <div className="mt-5 text-center text-xs text-muted">
+              Booking created on {bookingCreatedDate}
+            </div>
+
             {/* Download Ticket */}
+
             <div className="mt-7">
               <Button onClick={() => window.print()}>
                 <span className="flex items-center justify-center gap-2">

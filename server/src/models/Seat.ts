@@ -1,10 +1,13 @@
-import mongoose, { Document, Schema } from "mongoose";
+import mongoose, { Schema } from "mongoose";
 
-export interface ISeat extends Document {
+export interface ISeat {
   busId: mongoose.Types.ObjectId;
   seatNumber: string;
   seatType: "seater" | "sleeper";
+  status: "available" | "booked";
   price: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const seatSchema = new Schema<ISeat>(
@@ -27,6 +30,13 @@ const seatSchema = new Schema<ISeat>(
       enum: ["seater", "sleeper"],
     },
 
+    status: {
+      type: String,
+      required: true,
+      enum: ["available", "booked"],
+      default: "available",
+    },
+
     price: {
       type: Number,
       required: true,
@@ -38,7 +48,15 @@ const seatSchema = new Schema<ISeat>(
   },
 );
 
-seatSchema.index({ busId: 1, seatNumber: 1 }, { unique: true });
+seatSchema.index(
+  {
+    busId: 1,
+    seatNumber: 1,
+  },
+  {
+    unique: true,
+  },
+);
 
 const Seat = mongoose.model<ISeat>("Seat", seatSchema);
 
