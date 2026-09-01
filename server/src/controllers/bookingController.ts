@@ -5,6 +5,7 @@ import Booking from "../models/Booking.js";
 import Bus from "../models/Bus.js";
 import Seat from "../models/Seat.js";
 import type { AuthRequest } from "../middleware/authMiddleware.js";
+import { sendSuccess } from "../utils/apiResponse.js";
 
 export const createBooking = async (
   req: Request,
@@ -264,11 +265,7 @@ export const createBooking = async (
       "operator source destination busType departureTime arrivalTime",
     );
 
-    res.status(201).json({
-      success: true,
-      message: "Booking created successfully",
-      data: populatedBooking,
-    });
+    sendSuccess(res, populatedBooking, "Booking created successfully", 201);
   } catch (error: any) {
     if (session.inTransaction()) {
       await session.abortTransaction();
@@ -318,11 +315,7 @@ export const getMyBookings = async (
         createdAt: -1,
       });
 
-    res.status(200).json({
-      success: true,
-      message: "Bookings fetched successfully",
-      data: bookings,
-    });
+    sendSuccess(res, bookings, "Bookings fetched successfully");
   } catch (error) {
     next(error);
   }
@@ -372,11 +365,7 @@ export const getBookingById = async (
       return;
     }
 
-    res.status(200).json({
-      success: true,
-      message: "Booking fetched successfully",
-      data: booking,
-    });
+    sendSuccess(res, booking, "Booking fetched successfully");
   } catch (error) {
     next(error);
   }
@@ -516,11 +505,7 @@ export const cancelBooking = async (
       "operator source destination busType departureTime arrivalTime",
     );
 
-    res.status(200).json({
-      success: true,
-      message: "Booking cancelled successfully",
-      data: updatedBooking,
-    });
+    sendSuccess(res, updatedBooking, "Booking cancelled successfully");
   } catch (error) {
     if (session.inTransaction()) {
       await session.abortTransaction();
