@@ -4,7 +4,6 @@ export interface ISeat extends Document {
   busId: mongoose.Types.ObjectId;
   seatNumber: string;
   seatType: "seater" | "sleeper";
-  status: "available" | "booked";
   price: number;
 }
 
@@ -26,13 +25,6 @@ const seatSchema = new Schema<ISeat>(
       type: String,
       required: true,
       enum: ["seater", "sleeper"],
-    },
-
-    status: {
-      type: String,
-      required: true,
-      enum: ["available", "booked"],
-      default: "available",
     },
 
     price: {

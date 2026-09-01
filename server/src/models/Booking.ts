@@ -1,7 +1,11 @@
 import mongoose, { Document, Schema } from "mongoose";
 
 export interface IBooking extends Document {
+  userId: mongoose.Types.ObjectId;
   busId: mongoose.Types.ObjectId;
+
+  journeyDate: Date;
+
   passenger: {
     name: string;
     age: number;
@@ -9,18 +13,34 @@ export interface IBooking extends Document {
     phone: string;
     email: string;
   };
+
   seats: string[];
+
   totalAmount: number;
+
   paymentMethod: "card" | "upi";
+
   paymentStatus: "pending" | "paid" | "failed";
+
   bookingStatus: "confirmed" | "cancelled";
 }
 
 const bookingSchema = new Schema<IBooking>(
   {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
     busId: {
       type: Schema.Types.ObjectId,
       ref: "Bus",
+      required: true,
+    },
+
+    journeyDate: {
+      type: Date,
       required: true,
     },
 

@@ -4,12 +4,18 @@ type ButtonProps = {
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
+  type?: "button" | "submit" | "reset";
 };
 
-function Button({ children, onClick, disabled = false }: ButtonProps) {
+function Button({
+  children,
+  onClick,
+  disabled = false,
+  type = "button",
+}: ButtonProps) {
   return (
     <button
-      type="button"
+      type={type}
       onClick={onClick}
       disabled={disabled}
       className="

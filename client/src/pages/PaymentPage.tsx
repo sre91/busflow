@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CreditCard, LockKeyhole, Smartphone } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
+import { getApiErrorMessage } from "../api/apiError";
 
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
@@ -83,7 +84,7 @@ function PaymentPage() {
     } catch (error) {
       console.error("Booking failed:", error);
 
-      setPaymentError("Unable to complete the booking. Please try again.");
+      setPaymentError(getApiErrorMessage(error));
     } finally {
       setIsProcessing(false);
     }

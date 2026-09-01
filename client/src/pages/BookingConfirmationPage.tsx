@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { CheckCircle2, Clock3, Download, MapPin, Ticket } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -5,11 +6,20 @@ import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 
-import { useAppSelector } from "../app/hooks";
+import { useAppDispatch } from "../app/hooks";
+import { clearBooking } from "../features/booking/bookingSlice";
 
 type Booking = {
   _id: string;
-  busId: string;
+  busId: {
+    _id: string;
+    operator: string;
+    source: string;
+    destination: string;
+    busType: string;
+    departureTime?: string;
+    arrivalTime?: string;
+  };
   passenger: {
     name: string;
     age: number;
@@ -29,14 +39,15 @@ type Booking = {
 function BookingConfirmationPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
 
   const booking = location.state?.booking as Booking | undefined;
 
-  const { busOperator, source, destination } = useAppSelector(
-    (state) => state.booking,
-  );
-
-  const convenienceFee = 49;
+  useEffect(() => {
+    if (booking) {
+      dispatch(clearBooking());
+    }
+  }, [booking, dispatch]);
 
   if (!booking) {
     return (
@@ -57,6 +68,8 @@ function BookingConfirmationPage() {
       </main>
     );
   }
+
+  const convenienceFee = 49;
 
   const seatFare = booking.totalAmount - convenienceFee;
 
@@ -108,24 +121,24 @@ function BookingConfirmationPage() {
             {/* Bus */}
             <div>
               <h2 className="text-xl font-bold text-primary-dark">
-                {busOperator}
+                {booking.busId.operator}
               </h2>
 
-              <p className="mt-1 text-sm text-muted">Bus booking</p>
+              <p className="mt-1 text-sm text-muted">{booking.busId.busType}</p>
             </div>
 
             {/* Route */}
             <div className="mt-7 grid gap-6 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
               <div>
-                <p className="text-sm text-muted">From</p>
+                <p className="text-sm text-muted">Departure</p>
 
                 <p className="mt-1 text-2xl font-bold text-primary-dark">
-                  {source}
+                  {booking.busId.departureTime || "--"}
                 </p>
 
                 <p className="mt-2 flex items-center gap-2 text-sm text-muted">
                   <MapPin size={16} />
-                  {source}
+                  {booking.busId.source}
                 </p>
               </div>
 
@@ -134,15 +147,15 @@ function BookingConfirmationPage() {
               </div>
 
               <div className="sm:text-right">
-                <p className="text-sm text-muted">To</p>
+                <p className="text-sm text-muted">Arrival</p>
 
                 <p className="mt-1 text-2xl font-bold text-primary-dark">
-                  {destination}
+                  {booking.busId.arrivalTime || "--"}
                 </p>
 
                 <p className="mt-2 flex items-center gap-2 text-sm text-muted sm:justify-end">
                   <MapPin size={16} />
-                  {destination}
+                  {booking.busId.destination}
                 </p>
               </div>
             </div>
@@ -174,7 +187,7 @@ function BookingConfirmationPage() {
               </div>
             </div>
 
-            {/* Passenger Contact */}
+            {/* Passenger Details */}
             <div className="mt-6 rounded-2xl border border-slate-200 p-5">
               <h3 className="font-bold text-primary-dark">Passenger details</h3>
 
@@ -252,7 +265,7 @@ function BookingConfirmationPage() {
               </div>
             </div>
 
-            {/* Download */}
+            {/* Download Ticket */}
             <div className="mt-7">
               <Button onClick={() => window.print()}>
                 <span className="flex items-center justify-center gap-2">
