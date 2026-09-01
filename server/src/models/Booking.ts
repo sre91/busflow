@@ -139,6 +139,17 @@ bookingSchema.index(
   },
 );
 
+/*
+ * Speed up the "My Bookings" query.
+ *
+ * Bookings are filtered by userId
+ * and sorted by newest first.
+ */
+bookingSchema.index({
+  userId: 1,
+  createdAt: -1,
+});
+
 const Booking = mongoose.model<IBooking>("Booking", bookingSchema);
 
 export default Booking;
