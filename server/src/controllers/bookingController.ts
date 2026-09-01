@@ -69,7 +69,7 @@ export const createBooking = async (
       return;
     }
 
-    // Prevent duplicate seats
+    // Prevent duplicate seats in the same request
     const uniqueSeats = [...new Set(seats)];
 
     if (uniqueSeats.length !== seats.length) {
@@ -100,13 +100,13 @@ export const createBooking = async (
       return;
     }
 
-    // Find selected seats
+    // Find selected seats belonging to this bus
     const seatDocuments = await Seat.find({
       busId,
       seatNumber: { $in: uniqueSeats },
     });
 
-    // Make sure all seats exist
+    // Make sure every requested seat exists
     if (seatDocuments.length !== uniqueSeats.length) {
       res.status(400).json({
         success: false,
@@ -115,7 +115,7 @@ export const createBooking = async (
       return;
     }
 
-    // Check whether seats are already booked
+    // Check whether selected seats are already booked
     // for this bus and journey date
     const existingBookings = await Booking.find({
       busId,
@@ -153,7 +153,7 @@ export const createBooking = async (
       bookingStatus: "confirmed",
     });
 
-    // Update available seats on the bus
+    // Update bus available seat count
     bus.availableSeats = Math.max(0, bus.availableSeats - uniqueSeats.length);
 
     await bus.save();
@@ -169,7 +169,16 @@ export const createBooking = async (
       message: "Booking created successfully",
       data: populatedBooking,
     });
-  } catch (error) {
+  } catch (error: any) {
+    // MongoDB duplicate-key error
+    if (error?.code === 11000) {
+      res.status(409).json({
+        success: false,
+        message: "One or more selected seats are already booked",
+      });
+      return;
+    }
+
     next(error);
   }
 };
@@ -321,7 +330,7 @@ export const cancelBooking = async (
 
     await booking.save();
 
-    // Return the bus seat count
+    // Restore bus available seat count
     const bus = await Bus.findById(booking.busId);
 
     if (bus) {

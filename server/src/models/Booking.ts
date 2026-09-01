@@ -118,6 +118,27 @@ const bookingSchema = new Schema<IBooking>(
   },
 );
 
+/*
+ * Prevent the same seat from being booked twice
+ * for the same bus and journey date.
+ *
+ * The rule applies only to confirmed bookings.
+ * Cancelled bookings do not block the seat.
+ */
+bookingSchema.index(
+  {
+    busId: 1,
+    journeyDate: 1,
+    seats: 1,
+  },
+  {
+    unique: true,
+    partialFilterExpression: {
+      bookingStatus: "confirmed",
+    },
+  },
+);
+
 const Booking = mongoose.model<IBooking>("Booking", bookingSchema);
 
 export default Booking;
