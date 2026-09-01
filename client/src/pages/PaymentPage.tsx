@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CreditCard, LockKeyhole, Smartphone } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+
 import { getApiErrorMessage } from "../api/apiError";
 
 import Badge from "../components/ui/Badge";
@@ -28,16 +29,20 @@ function PaymentPage() {
 
   const navigate = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
 
   const {
     busId,
     busOperator,
     source,
     destination,
+    journeyDate,
     selectedSeats,
     totalAmount,
     passenger,
   } = useAppSelector((state) => state.booking);
+
+  const urlJourneyDate = searchParams.get("journeyDate") || journeyDate;
 
   const convenienceFee = 49;
 
@@ -54,7 +59,13 @@ function PaymentPage() {
   const isPaymentValid = paymentMethod === "card" ? isCardValid : isUpiValid;
 
   const handlePayment = async () => {
-    if (!isPaymentValid || !passenger || !busId) {
+    if (
+      !isPaymentValid ||
+      !passenger ||
+      !busId ||
+      !urlJourneyDate ||
+      selectedSeats.length === 0
+    ) {
       return;
     }
 
@@ -64,6 +75,9 @@ function PaymentPage() {
     try {
       const booking = await createBooking({
         busId,
+
+        journeyDate: urlJourneyDate,
+
         passenger: {
           name: passenger.name,
           age: Number(passenger.age),
@@ -71,8 +85,9 @@ function PaymentPage() {
           phone: passenger.phone,
           email: passenger.email,
         },
+
         seats: selectedSeats,
-        totalAmount: finalTotal,
+
         paymentMethod,
       });
 
@@ -90,7 +105,7 @@ function PaymentPage() {
     }
   };
 
-  if (selectedSeats.length === 0 || !passenger || !busId) {
+  if (selectedSeats.length === 0 || !passenger || !busId || !urlJourneyDate) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background">
         <Card className="text-center">
@@ -104,7 +119,15 @@ function PaymentPage() {
           </p>
 
           <div className="mt-6">
-            <Button onClick={() => navigate(`/bus/${id}/seats`)}>
+            <Button
+              onClick={() =>
+                navigate(
+                  `/bus/${id}/seats?journeyDate=${encodeURIComponent(
+                    urlJourneyDate,
+                  )}`,
+                )
+              }
+            >
               Start Booking
             </Button>
           </div>
@@ -279,6 +302,14 @@ function PaymentPage() {
 
                 <span className="font-semibold text-primary-dark">
                   {source} → {destination}
+                </span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-muted">Journey date</span>
+
+                <span className="font-semibold text-primary-dark">
+                  {urlJourneyDate}
                 </span>
               </div>
 

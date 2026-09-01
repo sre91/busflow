@@ -13,8 +13,13 @@ type BookingState = {
   busOperator: string;
   source: string;
   destination: string;
+
+  journeyDate: string;
+
   selectedSeats: string[];
+
   totalAmount: number;
+
   passenger: Passenger | null;
 };
 
@@ -23,14 +28,21 @@ const initialState: BookingState = {
   busOperator: "",
   source: "",
   destination: "",
+
+  journeyDate: "",
+
   selectedSeats: [],
+
   totalAmount: 0,
+
   passenger: null,
 };
 
 const bookingSlice = createSlice({
   name: "booking",
+
   initialState,
+
   reducers: {
     setBookingBus: (
       state,
@@ -45,6 +57,10 @@ const bookingSlice = createSlice({
       state.busOperator = action.payload.busOperator;
       state.source = action.payload.source;
       state.destination = action.payload.destination;
+    },
+
+    setJourneyDate: (state, action: PayloadAction<string>) => {
+      state.journeyDate = action.payload;
     },
 
     setSelectedSeats: (
@@ -67,6 +83,7 @@ const bookingSlice = createSlice({
       state.busOperator = "";
       state.source = "";
       state.destination = "";
+      state.journeyDate = "";
       state.selectedSeats = [];
       state.totalAmount = 0;
       state.passenger = null;
@@ -74,7 +91,12 @@ const bookingSlice = createSlice({
   },
 });
 
-export const { setBookingBus, setSelectedSeats, setPassenger, clearBooking } =
-  bookingSlice.actions;
+export const {
+  setBookingBus,
+  setJourneyDate,
+  setSelectedSeats,
+  setPassenger,
+  clearBooking,
+} = bookingSlice.actions;
 
 export default bookingSlice.reducer;

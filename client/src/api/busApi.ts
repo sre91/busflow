@@ -29,12 +29,6 @@ interface SingleBusResponse {
   data: Bus;
 }
 
-export interface BusSearchParams {
-  source?: string;
-  destination?: string;
-  busType?: string;
-}
-
 export const getBuses = async (params?: BusSearchParams): Promise<Bus[]> => {
   const response = await api.get<BusResponse>("/buses", {
     params,
@@ -48,6 +42,12 @@ export const getBusById = async (id: string): Promise<Bus> => {
 
   return response.data.data;
 };
+
+export interface BusSearchParams {
+  source?: string;
+  destination?: string;
+  busType?: string;
+}
 
 export interface Seat {
   _id: string;
@@ -66,8 +66,17 @@ interface SeatResponse {
   data: Seat[];
 }
 
-export const getSeatsByBus = async (busId: string): Promise<Seat[]> => {
-  const response = await api.get<SeatResponse>(`/seats/${busId}`);
+export const getSeatsByBus = async (
+  busId: string,
+  journeyDate?: string,
+): Promise<Seat[]> => {
+  const response = await api.get<SeatResponse>(`/seats/${busId}`, {
+    params: journeyDate
+      ? {
+          journeyDate,
+        }
+      : undefined,
+  });
 
   return response.data.data;
 };

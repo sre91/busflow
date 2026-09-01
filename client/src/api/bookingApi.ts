@@ -3,6 +3,8 @@ import api from "./axios";
 export interface CreateBookingData {
   busId: string;
 
+  journeyDate: string;
+
   passenger: {
     name: string;
     age: number;
@@ -12,8 +14,6 @@ export interface CreateBookingData {
   };
 
   seats: string[];
-
-  totalAmount: number;
 
   paymentMethod: "card" | "upi";
 }
@@ -32,6 +32,8 @@ export interface Booking {
   _id: string;
 
   busId: BookingBus;
+
+  journeyDate: string;
 
   passenger: {
     name: string;

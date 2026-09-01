@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Mail, Phone, UserRound } from "lucide-react";
 
 import Badge from "../components/ui/Badge";
@@ -22,11 +22,20 @@ type PassengerForm = {
 function PassengerDetailsPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
 
   const dispatch = useAppDispatch();
 
-  const { busOperator, source, destination, selectedSeats, totalAmount } =
-    useAppSelector((state) => state.booking);
+  const {
+    busOperator,
+    source,
+    destination,
+    journeyDate,
+    selectedSeats,
+    totalAmount,
+  } = useAppSelector((state) => state.booking);
+
+  const urlJourneyDate = searchParams.get("journeyDate") || journeyDate;
 
   const [passenger, setPassengerForm] = useState<PassengerForm>({
     name: "",
@@ -61,7 +70,9 @@ function PassengerDetailsPage() {
 
     dispatch(setPassenger(passenger));
 
-    navigate(`/bus/${id}/payment`);
+    navigate(
+      `/bus/${id}/payment?journeyDate=${encodeURIComponent(urlJourneyDate)}`,
+    );
   };
 
   if (selectedSeats.length === 0) {
@@ -77,7 +88,15 @@ function PassengerDetailsPage() {
           </p>
 
           <div className="mt-6">
-            <Button onClick={() => navigate(`/bus/${id}/seats`)}>
+            <Button
+              onClick={() =>
+                navigate(
+                  `/bus/${id}/seats?journeyDate=${encodeURIComponent(
+                    urlJourneyDate,
+                  )}`,
+                )
+              }
+            >
               Select Seats
             </Button>
           </div>
@@ -156,11 +175,8 @@ function PassengerDetailsPage() {
                   className="w-full rounded-xl border border-slate-200 bg-surface px-4 py-3 text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                 >
                   <option value="">Select gender</option>
-
                   <option value="male">Male</option>
-
                   <option value="female">Female</option>
-
                   <option value="other">Other</option>
                 </select>
               </div>
@@ -231,6 +247,14 @@ function PassengerDetailsPage() {
 
                 <span className="font-semibold text-primary-dark">
                   {source} → {destination}
+                </span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-muted">Journey date</span>
+
+                <span className="font-semibold text-primary-dark">
+                  {urlJourneyDate}
                 </span>
               </div>
 

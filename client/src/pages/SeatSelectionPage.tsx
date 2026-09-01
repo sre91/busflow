@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Armchair, Check, UserRound } from "lucide-react";
 
 import Badge from "../components/ui/Badge";
@@ -12,6 +12,7 @@ import { useAppDispatch } from "../app/hooks";
 
 import {
   setBookingBus,
+  setJourneyDate,
   setSelectedSeats as saveSelectedSeats,
 } from "../features/booking/bookingSlice";
 
@@ -25,8 +26,11 @@ function SeatSelectionPage() {
 
   const navigate = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
 
   const dispatch = useAppDispatch();
+
+  const journeyDate = searchParams.get("journeyDate") || "";
 
   useEffect(() => {
     const fetchSeatData = async () => {
@@ -36,10 +40,16 @@ function SeatSelectionPage() {
         return;
       }
 
+      if (!journeyDate) {
+        setError("Journey date is missing");
+        setLoading(false);
+        return;
+      }
+
       try {
         const [busData, seatData] = await Promise.all([
           getBusById(id),
-          getSeatsByBus(id),
+          getSeatsByBus(id, journeyDate),
         ]);
 
         setBus(busData);
@@ -53,6 +63,8 @@ function SeatSelectionPage() {
             destination: busData.destination,
           }),
         );
+
+        dispatch(setJourneyDate(journeyDate));
       } catch (error) {
         console.error("Failed to fetch seat data:", error);
 
@@ -63,7 +75,7 @@ function SeatSelectionPage() {
     };
 
     fetchSeatData();
-  }, [id, dispatch]);
+  }, [id, journeyDate, dispatch]);
 
   const toggleSeat = (seat: Seat) => {
     if (seat.status === "booked") {
@@ -148,6 +160,10 @@ function SeatSelectionPage() {
 
           <p className="mt-2 text-muted">
             {bus.operator} · {bus.source} → {bus.destination}
+          </p>
+
+          <p className="mt-1 text-sm font-medium text-primary">
+            Journey date: {journeyDate}
           </p>
         </div>
 
@@ -276,6 +292,14 @@ function SeatSelectionPage() {
               </div>
 
               <div className="flex justify-between">
+                <span className="text-muted">Journey date</span>
+
+                <span className="font-semibold text-primary-dark">
+                  {journeyDate}
+                </span>
+              </div>
+
+              <div className="flex justify-between">
                 <span className="text-muted">Seats</span>
 
                 <span className="font-semibold text-primary-dark">
@@ -311,7 +335,13 @@ function SeatSelectionPage() {
             <div className="mt-7">
               <Button
                 disabled={selectedSeats.length === 0}
-                onClick={() => navigate(`/bus/${id}/passenger`)}
+                onClick={() =>
+                  navigate(
+                    `/bus/${id}/passenger?journeyDate=${encodeURIComponent(
+                      journeyDate,
+                    )}`,
+                  )
+                }
               >
                 Continue
               </Button>
