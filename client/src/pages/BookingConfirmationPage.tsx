@@ -11,6 +11,7 @@ import { clearBooking } from "../features/booking/bookingSlice";
 
 type Booking = {
   _id: string;
+
   busId: {
     _id: string;
     operator: string;
@@ -20,6 +21,9 @@ type Booking = {
     departureTime?: string;
     arrivalTime?: string;
   };
+
+  journeyDate: string;
+
   passenger: {
     name: string;
     age: number;
@@ -27,12 +31,19 @@ type Booking = {
     phone: string;
     email: string;
   };
+
   seats: string[];
+
   totalAmount: number;
+
   paymentMethod: "card" | "upi";
+
   paymentStatus: "pending" | "paid" | "failed";
+
   bookingStatus: "confirmed" | "cancelled";
+
   createdAt: string;
+
   updatedAt: string;
 };
 
@@ -71,7 +82,16 @@ function BookingConfirmationPage() {
 
   const convenienceFee = 49;
 
-  const seatFare = booking.totalAmount - convenienceFee;
+  const seatFare = Math.max(0, booking.totalAmount - convenienceFee);
+
+  const journeyDate = new Date(booking.journeyDate).toLocaleDateString(
+    "en-IN",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    },
+  );
 
   const bookingDate = new Date(booking.createdAt).toLocaleDateString("en-IN", {
     day: "2-digit",
@@ -161,7 +181,15 @@ function BookingConfirmationPage() {
             </div>
 
             {/* Booking Details */}
-            <div className="mt-8 grid gap-5 border-t border-slate-200 pt-6 sm:grid-cols-3">
+            <div className="mt-8 grid gap-5 border-t border-slate-200 pt-6 sm:grid-cols-4">
+              <div>
+                <p className="text-sm text-muted">Journey date</p>
+
+                <p className="mt-1 font-semibold text-primary-dark">
+                  {journeyDate}
+                </p>
+              </div>
+
               <div>
                 <p className="text-sm text-muted">Booking date</p>
 

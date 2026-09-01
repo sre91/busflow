@@ -138,7 +138,9 @@ export const createBooking = async (
     }
 
     // Calculate amount on the backend
-    const totalAmount = bus.price * uniqueSeats.length;
+    const convenienceFee = 49;
+
+    const totalAmount = bus.price * uniqueSeats.length + convenienceFee;
 
     // Create booking
     const booking = await Booking.create({

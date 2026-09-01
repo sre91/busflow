@@ -133,6 +133,21 @@ function BookingDetailsPage() {
 
   const isCancelled = booking.bookingStatus === "cancelled";
 
+  const journeyDate = new Date(booking.journeyDate).toLocaleDateString(
+    "en-IN",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    },
+  );
+
+  const bookingDate = new Date(booking.createdAt).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
   return (
     <main className="min-h-screen bg-background">
       <section className="mx-auto max-w-4xl px-6 py-10">
@@ -207,7 +222,23 @@ function BookingDetailsPage() {
               </div>
             </div>
 
-            <div className="mt-8 grid gap-5 border-t border-slate-200 pt-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-8 grid gap-5 border-t border-slate-200 pt-6 sm:grid-cols-2 lg:grid-cols-5">
+              <div>
+                <p className="text-sm text-muted">Journey date</p>
+
+                <p className="mt-1 font-semibold text-primary-dark">
+                  {journeyDate}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-muted">Booking date</p>
+
+                <p className="mt-1 font-semibold text-primary-dark">
+                  {bookingDate}
+                </p>
+              </div>
+
               <div>
                 <p className="text-sm text-muted">Bus type</p>
 
@@ -231,18 +262,18 @@ function BookingDetailsPage() {
                   {booking.paymentMethod}
                 </p>
               </div>
+            </div>
 
-              <div>
-                <p className="text-sm text-muted">Status</p>
+            <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-6">
+              <span className="text-sm text-muted">Booking status</span>
 
-                <p
-                  className={`mt-1 font-semibold capitalize ${
-                    isCancelled ? "text-red-500" : "text-success"
-                  }`}
-                >
-                  {booking.bookingStatus}
-                </p>
-              </div>
+              <span
+                className={`font-semibold capitalize ${
+                  isCancelled ? "text-red-500" : "text-success"
+                }`}
+              >
+                {booking.bookingStatus}
+              </span>
             </div>
           </div>
         </Card>

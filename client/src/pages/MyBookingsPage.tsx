@@ -125,91 +125,116 @@ function MyBookingsPage() {
           </Card>
         ) : (
           <div className="mt-8 grid gap-5">
-            {bookings.map((booking) => (
-              <Card key={booking._id}>
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="text-xl font-bold text-primary-dark">
-                        {booking.busId.operator}
-                      </h2>
+            {bookings.map((booking) => {
+              const journeyDate = new Date(
+                booking.journeyDate,
+              ).toLocaleDateString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              });
 
-                      <Badge
-                        variant={
-                          booking.bookingStatus === "confirmed"
-                            ? "success"
-                            : "primary"
-                        }
-                      >
-                        {booking.bookingStatus}
-                      </Badge>
+              const bookingDate = new Date(
+                booking.createdAt,
+              ).toLocaleDateString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              });
+
+              return (
+                <Card key={booking._id}>
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h2 className="text-xl font-bold text-primary-dark">
+                          {booking.busId.operator}
+                        </h2>
+
+                        <Badge
+                          variant={
+                            booking.bookingStatus === "confirmed"
+                              ? "success"
+                              : "primary"
+                          }
+                        >
+                          {booking.bookingStatus}
+                        </Badge>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-muted">
+                        <span className="flex items-center gap-2">
+                          <MapPin size={16} />
+                          {booking.busId.source} → {booking.busId.destination}
+                        </span>
+
+                        <span className="flex items-center gap-2">
+                          <CalendarDays size={16} />
+                          Journey: {journeyDate}
+                        </span>
+
+                        <span className="flex items-center gap-2">
+                          <Clock3 size={16} />
+
+                          {booking.busId.departureTime || "Departure time"}
+                        </span>
+                      </div>
+
+                      <div className="mt-5 flex flex-wrap gap-6 border-t border-slate-200 pt-5 text-sm">
+                        <div>
+                          <p className="text-muted">Booking ID</p>
+
+                          <p className="mt-1 font-semibold text-primary-dark">
+                            {booking._id}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-muted">Seats</p>
+
+                          <p className="mt-1 font-semibold text-primary-dark">
+                            {booking.seats.join(", ")}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-muted">Passenger</p>
+
+                          <p className="mt-1 font-semibold text-primary-dark">
+                            {booking.passenger.name}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-muted">Booking date</p>
+
+                          <p className="mt-1 font-semibold text-primary-dark">
+                            {bookingDate}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-muted">Total paid</p>
+
+                          <p className="mt-1 font-semibold text-primary">
+                            ₹{booking.totalAmount}
+                          </p>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-muted">
-                      <span className="flex items-center gap-2">
-                        <MapPin size={16} />
-                        {booking.busId.source} → {booking.busId.destination}
-                      </span>
-
-                      <span className="flex items-center gap-2">
-                        <CalendarDays size={16} />
-
-                        {new Date(booking.createdAt).toLocaleDateString()}
-                      </span>
-
-                      <span className="flex items-center gap-2">
-                        <Clock3 size={16} />
-
-                        {booking.busId.departureTime || "Departure time"}
-                      </span>
-                    </div>
-
-                    <div className="mt-5 flex flex-wrap gap-6 border-t border-slate-200 pt-5 text-sm">
-                      <div>
-                        <p className="text-muted">Booking ID</p>
-
-                        <p className="mt-1 font-semibold text-primary-dark">
-                          {booking._id}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-muted">Seats</p>
-
-                        <p className="mt-1 font-semibold text-primary-dark">
-                          {booking.seats.join(", ")}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-muted">Passenger</p>
-
-                        <p className="mt-1 font-semibold text-primary-dark">
-                          {booking.passenger.name}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-muted">Total paid</p>
-
-                        <p className="mt-1 font-semibold text-primary">
-                          ₹{booking.totalAmount}
-                        </p>
-                      </div>
-                    </div>
+                    <Link to={`/booking/${booking._id}`} className="shrink-0">
+                      <Button>
+                        <span className="flex items-center justify-center gap-2">
+                          View details
+                          <ChevronRight size={18} />
+                        </span>
+                      </Button>
+                    </Link>
                   </div>
-
-                  <Link to={`/booking/${booking._id}`} className="shrink-0">
-                    <Button>
-                      <span className="flex items-center justify-center gap-2">
-                        View details
-                        <ChevronRight size={18} />
-                      </span>
-                    </Button>
-                  </Link>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </section>
