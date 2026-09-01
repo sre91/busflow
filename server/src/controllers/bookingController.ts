@@ -285,9 +285,9 @@ export const cancelBooking = async (
     const authReq = req as AuthRequest;
 
     const userId = authReq.user?.userId;
-
     const id = req.params.id as string;
 
+    // Check authentication
     if (!userId) {
       res.status(401).json({
         success: false,
@@ -296,6 +296,7 @@ export const cancelBooking = async (
       return;
     }
 
+    // Validate booking ID
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({
         success: false,
@@ -304,6 +305,7 @@ export const cancelBooking = async (
       return;
     }
 
+    // Find booking belonging to the logged-in user
     const booking = await Booking.findOne({
       _id: id,
       userId,
@@ -317,6 +319,7 @@ export const cancelBooking = async (
       return;
     }
 
+    // Prevent cancelling an already cancelled booking
     if (booking.bookingStatus === "cancelled") {
       res.status(400).json({
         success: false,
@@ -330,12 +333,13 @@ export const cancelBooking = async (
 
     await booking.save();
 
-    // Restore bus available seat count
+    // Restore available seats on the bus
     const bus = await Bus.findById(booking.busId);
 
     if (bus) {
       bus.availableSeats += booking.seats.length;
 
+      // Never allow available seats to exceed total seats
       if (bus.availableSeats > bus.totalSeats) {
         bus.availableSeats = bus.totalSeats;
       }
@@ -343,6 +347,7 @@ export const cancelBooking = async (
       await bus.save();
     }
 
+    // Fetch updated booking with bus information
     const updatedBooking = await Booking.findById(booking._id).populate(
       "busId",
       "operator source destination busType departureTime arrivalTime",
