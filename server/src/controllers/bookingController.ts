@@ -1,176 +1,152 @@
-import { Request, Response, NextFunction } from "express";
+import { Response, NextFunction } from "express";
 import mongoose from "mongoose";
 
 import Booking from "../models/Booking.js";
 import Bus from "../models/Bus.js";
 import Seat from "../models/Seat.js";
-import type { AuthRequest } from "../middleware/authMiddleware.js";
-import { sendSuccess } from "../utils/apiResponse.js";
+import { AuthRequest } from "../middleware/authMiddleware.js";
+import { getIO } from "../socket/socket.js";
 
+// Create booking
 export const createBooking = async (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction,
 ) => {
   const session = await mongoose.startSession();
 
   try {
-    const authReq = req as AuthRequest;
-
-    const userId = authReq.user?.userId;
-
-    if (!userId) {
-      res.status(401).json({
+    if (!req.user) {
+      return res.status(401).json({
         success: false,
-        message: "Authenticated user is required",
+        message: "Authentication required",
       });
-      return;
     }
 
     const { busId, journeyDate, passenger, seats, paymentMethod } = req.body;
 
-    // Validate bus ID
     if (!busId || !mongoose.Types.ObjectId.isValid(busId)) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: "Valid bus ID is required",
       });
-      return;
     }
 
-    // Validate journey date
-    if (!journeyDate || isNaN(new Date(journeyDate).getTime())) {
-      res.status(400).json({
+    if (!journeyDate) {
+      return res.status(400).json({
         success: false,
-        message: "Valid journey date is required",
+        message: "Journey date is required",
       });
-      return;
     }
 
-    const parsedJourneyDate = new Date(journeyDate);
+    const selectedJourneyDate = new Date(journeyDate);
 
-    const today = new Date();
+    if (Number.isNaN(selectedJourneyDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid journey date",
+      });
+    }
 
-    today.setHours(0, 0, 0, 0);
-
-    parsedJourneyDate.setHours(0, 0, 0, 0);
-
-    if (parsedJourneyDate < today) {
-      res.status(400).json({
+    if (selectedJourneyDate < new Date()) {
+      return res.status(400).json({
         success: false,
         message: "Journey date cannot be in the past",
       });
-      return;
     }
 
-    // Validate passenger details
     if (
       !passenger ||
-      typeof passenger.name !== "string" ||
-      passenger.name.trim().length < 2 ||
-      typeof passenger.age !== "number" ||
-      passenger.age < 1 ||
-      passenger.age > 120 ||
-      !["male", "female", "other"].includes(passenger.gender) ||
-      typeof passenger.phone !== "string" ||
-      !/^\d{10}$/.test(passenger.phone.trim()) ||
-      typeof passenger.email !== "string" ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(passenger.email.trim())
+      !passenger.name ||
+      !passenger.age ||
+      !passenger.gender ||
+      !passenger.phone ||
+      !passenger.email
     ) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
-        message: "Invalid passenger details",
+        message: "Complete passenger details are required",
       });
-      return;
     }
 
-    // Validate seats
     if (!Array.isArray(seats) || seats.length === 0) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
-        message: "At least one seat is required",
+        message: "At least one seat must be selected",
       });
-      return;
     }
 
-    // Prevent duplicate seats
     const uniqueSeats = [...new Set(seats)];
 
     if (uniqueSeats.length !== seats.length) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: "Duplicate seats are not allowed",
       });
-      return;
     }
 
-    // Validate payment method
     if (!["card", "upi"].includes(paymentMethod)) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: "Invalid payment method",
       });
-      return;
     }
-
-    /*
-     * Start transaction
-     */
 
     session.startTransaction();
 
-    // Find bus
     const bus = await Bus.findById(busId).session(session);
 
     if (!bus) {
       await session.abortTransaction();
 
-      res.status(404).json({
+      return res.status(404).json({
         success: false,
         message: "Bus not found",
       });
-      return;
     }
 
-    // Find selected seats
-    const seatDocuments = await Seat.find({
+    const selectedSeats = await Seat.find({
       busId,
       seatNumber: {
         $in: uniqueSeats,
       },
     }).session(session);
 
-    // Make sure every seat exists
-    if (seatDocuments.length !== uniqueSeats.length) {
+    if (selectedSeats.length !== uniqueSeats.length) {
       await session.abortTransaction();
 
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
-        message: "One or more selected seats do not exist",
+        message: "One or more selected seats are invalid",
       });
-      return;
     }
 
-    // Check physical seat status
-    const alreadyBookedSeats = seatDocuments.filter(
-      (seat) => seat.status === "booked",
-    );
+    const alreadyBookedPhysicalSeats = selectedSeats
+      .filter((seat) => seat.status === "booked")
+      .map((seat) => seat.seatNumber);
 
-    if (alreadyBookedSeats.length > 0) {
+    if (alreadyBookedPhysicalSeats.length > 0) {
       await session.abortTransaction();
 
-      res.status(409).json({
+      return res.status(409).json({
         success: false,
         message: "One or more selected seats are already booked",
-        seats: alreadyBookedSeats.map((seat) => seat.seatNumber),
+        seats: alreadyBookedPhysicalSeats,
       });
-      return;
     }
 
-    // Check booking conflicts for this journey date
+    const startOfDay = new Date(selectedJourneyDate);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(selectedJourneyDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
     const existingBookings = await Booking.find({
       busId,
-      journeyDate: parsedJourneyDate,
+      journeyDate: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
       bookingStatus: "confirmed",
       seats: {
         $in: uniqueSeats,
@@ -178,43 +154,38 @@ export const createBooking = async (
     }).session(session);
 
     if (existingBookings.length > 0) {
-      const bookedSeats = existingBookings.flatMap((booking) =>
-        booking.seats.filter((seat) => uniqueSeats.includes(seat)),
-      );
+      const bookedSeats = [
+        ...new Set(existingBookings.flatMap((booking) => booking.seats)),
+      ];
 
       await session.abortTransaction();
 
-      res.status(409).json({
+      return res.status(409).json({
         success: false,
         message: "One or more selected seats are already booked",
-        seats: [...new Set(bookedSeats)],
+        seats: bookedSeats,
       });
-      return;
     }
 
-    // Make sure bus has enough available seats
     if (bus.availableSeats < uniqueSeats.length) {
       await session.abortTransaction();
 
-      res.status(409).json({
+      return res.status(400).json({
         success: false,
-        message: "Not enough seats are available",
+        message: "Not enough seats available",
       });
-      return;
     }
 
-    // Calculate total on backend
     const convenienceFee = 49;
 
     const totalAmount = bus.price * uniqueSeats.length + convenienceFee;
 
-    // Create booking inside transaction
-    const createdBookings = await Booking.create(
+    const [booking] = await Booking.create(
       [
         {
-          userId,
+          userId: req.user.userId,
           busId,
-          journeyDate: parsedJourneyDate,
+          journeyDate: selectedJourneyDate,
           passenger,
           seats: uniqueSeats,
           totalAmount,
@@ -228,16 +199,12 @@ export const createBooking = async (
       },
     );
 
-    const booking = createdBookings[0];
-
-    // Mark seats as booked
     await Seat.updateMany(
       {
         busId,
         seatNumber: {
           $in: uniqueSeats,
         },
-        status: "available",
       },
       {
         $set: {
@@ -249,63 +216,73 @@ export const createBooking = async (
       },
     );
 
-    // Decrease bus available seats
-    bus.availableSeats = Math.max(0, bus.availableSeats - uniqueSeats.length);
+    bus.availableSeats -= uniqueSeats.length;
 
     await bus.save({
       session,
     });
 
-    // Commit transaction
     await session.commitTransaction();
+    session.endSession();
 
-    // Populate after transaction completes
+    // Real-time seat update after successful booking
+    const io = getIO();
+
+    io.to(`bus:${busId}`).emit("seatUpdate", {
+      event: "booking",
+      busId,
+      bookedSeats: uniqueSeats,
+      releasedSeats: [],
+      availableSeats: bus.availableSeats,
+    });
+
     const populatedBooking = await Booking.findById(booking._id).populate(
       "busId",
       "operator source destination busType departureTime arrivalTime",
     );
 
-    sendSuccess(res, populatedBooking, "Booking created successfully", 201);
-  } catch (error: any) {
+    return res.status(201).json({
+      success: true,
+      message: "Booking created successfully",
+      data: populatedBooking,
+    });
+  } catch (error) {
     if (session.inTransaction()) {
       await session.abortTransaction();
     }
 
-    // MongoDB duplicate-key error
-    if (error?.code === 11000) {
-      res.status(409).json({
+    session.endSession();
+
+    if (
+      error instanceof mongoose.mongo.MongoServerError &&
+      error.code === 11000
+    ) {
+      return res.status(409).json({
         success: false,
         message: "One or more selected seats are already booked",
       });
-      return;
     }
 
     next(error);
-  } finally {
-    await session.endSession();
   }
 };
 
+// Get current user's bookings
 export const getMyBookings = async (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const authReq = req as AuthRequest;
-
-    const userId = authReq.user?.userId;
-
-    if (!userId) {
-      res.status(401).json({
+    if (!req.user) {
+      return res.status(401).json({
         success: false,
-        message: "Authenticated user is required",
+        message: "Authentication required",
       });
-      return;
     }
 
     const bookings = await Booking.find({
-      userId,
+      userId: req.user.userId,
     })
       .populate(
         "busId",
@@ -315,170 +292,152 @@ export const getMyBookings = async (
         createdAt: -1,
       });
 
-    sendSuccess(res, bookings, "Bookings fetched successfully");
+    return res.status(200).json({
+      success: true,
+      message: "Bookings fetched successfully",
+      data: bookings,
+    });
   } catch (error) {
     next(error);
   }
 };
 
+// Get booking by ID
 export const getBookingById = async (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const authReq = req as AuthRequest;
-
-    const userId = authReq.user?.userId;
-
-    const id = req.params.id as string;
-
-    if (!userId) {
-      res.status(401).json({
+    if (!req.user) {
+      return res.status(401).json({
         success: false,
-        message: "Authenticated user is required",
+        message: "Authentication required",
       });
-      return;
     }
 
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      res.status(400).json({
+    const { id } = req.params;
+
+    if (typeof id !== "string" || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
         success: false,
-        message: "Valid booking ID is required",
+        message: "Invalid booking ID",
       });
-      return;
     }
 
     const booking = await Booking.findOne({
       _id: id,
-      userId,
+      userId: req.user.userId,
     }).populate(
       "busId",
       "operator source destination busType departureTime arrivalTime",
     );
 
     if (!booking) {
-      res.status(404).json({
+      return res.status(404).json({
         success: false,
         message: "Booking not found",
       });
-      return;
     }
 
-    sendSuccess(res, booking, "Booking fetched successfully");
+    return res.status(200).json({
+      success: true,
+      message: "Booking fetched successfully",
+      data: booking,
+    });
   } catch (error) {
     next(error);
   }
 };
 
+// Cancel booking
 export const cancelBooking = async (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction,
 ) => {
   const session = await mongoose.startSession();
 
   try {
-    const authReq = req as AuthRequest;
-
-    const userId = authReq.user?.userId;
-
-    const id = req.params.id as string;
-
-    // Check authentication
-    if (!userId) {
-      res.status(401).json({
+    if (!req.user) {
+      return res.status(401).json({
         success: false,
-        message: "Authenticated user is required",
+        message: "Authentication required",
       });
-      return;
     }
 
-    // Validate booking ID
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      res.status(400).json({
-        success: false,
-        message: "Valid booking ID is required",
-      });
-      return;
-    }
+    const { id } = req.params;
 
-    /*
-     * Start transaction
-     */
+    if (typeof id !== "string" || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid booking ID",
+      });
+    }
 
     session.startTransaction();
 
-    // Find booking belonging to user
     const booking = await Booking.findOne({
       _id: id,
-      userId,
+      userId: req.user.userId,
     }).session(session);
 
     if (!booking) {
       await session.abortTransaction();
 
-      res.status(404).json({
+      return res.status(404).json({
         success: false,
         message: "Booking not found",
       });
-      return;
     }
 
-    // Prevent duplicate cancellation
     if (booking.bookingStatus === "cancelled") {
       await session.abortTransaction();
 
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: "Booking is already cancelled",
       });
-      return;
     }
-
-    // Prevent cancellation after journey date
-    const today = new Date();
-
-    today.setHours(0, 0, 0, 0);
 
     const journeyDate = new Date(booking.journeyDate);
 
-    journeyDate.setHours(0, 0, 0, 0);
-
-    if (journeyDate < today) {
+    if (journeyDate < new Date()) {
       await session.abortTransaction();
 
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
-        message:
-          "This booking can no longer be cancelled because the journey date has passed",
+        message: "Past bookings cannot be cancelled",
       });
-      return;
     }
 
-    // Mark booking as cancelled
+    const bus = await Bus.findById(booking.busId).session(session);
+
+    if (!bus) {
+      await session.abortTransaction();
+
+      return res.status(404).json({
+        success: false,
+        message: "Bus not found",
+      });
+    }
+
     booking.bookingStatus = "cancelled";
 
     await booking.save({
       session,
     });
 
-    // Restore bus seats
-    const bus = await Bus.findById(booking.busId).session(session);
+    bus.availableSeats += booking.seats.length;
 
-    if (bus) {
-      bus.availableSeats += booking.seats.length;
-
-      if (bus.availableSeats > bus.totalSeats) {
-        bus.availableSeats = bus.totalSeats;
-      }
-
-      await bus.save({
-        session,
-      });
+    if (bus.availableSeats > bus.totalSeats) {
+      bus.availableSeats = bus.totalSeats;
     }
 
-    // Restore physical seat status
+    await bus.save({
+      session,
+    });
+
     await Seat.updateMany(
       {
         busId: booking.busId,
@@ -496,23 +455,37 @@ export const cancelBooking = async (
       },
     );
 
-    // Commit transaction
     await session.commitTransaction();
+    session.endSession();
 
-    // Fetch updated booking
-    const updatedBooking = await Booking.findById(booking._id).populate(
+    // Real-time seat update after successful cancellation
+    const io = getIO();
+
+    io.to(`bus:${booking.busId.toString()}`).emit("seatUpdate", {
+      event: "cancellation",
+      busId: booking.busId.toString(),
+      bookedSeats: [],
+      releasedSeats: booking.seats,
+      availableSeats: bus.availableSeats,
+    });
+
+    const populatedBooking = await Booking.findById(booking._id).populate(
       "busId",
       "operator source destination busType departureTime arrivalTime",
     );
 
-    sendSuccess(res, updatedBooking, "Booking cancelled successfully");
+    return res.status(200).json({
+      success: true,
+      message: "Booking cancelled successfully",
+      data: populatedBooking,
+    });
   } catch (error) {
     if (session.inTransaction()) {
       await session.abortTransaction();
     }
 
+    session.endSession();
+
     next(error);
-  } finally {
-    await session.endSession();
   }
 };

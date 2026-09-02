@@ -15,6 +15,15 @@ import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import { useNavigate, useParams } from "react-router-dom";
 import { getBusById, type Bus } from "../api/busApi";
+import socket from "../socket";
+
+type SeatUpdateData = {
+  event: "booking" | "cancellation";
+  busId: string;
+  bookedSeats: string[];
+  releasedSeats: string[];
+  availableSeats: number;
+};
 
 function BusDetailsPage() {
   const navigate = useNavigate();
@@ -23,9 +32,13 @@ function BusDetailsPage() {
   const [bus, setBus] = useState<Bus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [seatUpdateMessage, setSeatUpdateMessage] = useState("");
 
+  const [isSocketConnected, setIsSocketConnected] = useState(socket.connected);
+
+  // Fetch bus details
   useEffect(() => {
-    const fetchBus = async () => {
+    const loadBus = async () => {
       if (!id) {
         setError("Bus ID is missing");
         setLoading(false);
@@ -36,6 +49,7 @@ function BusDetailsPage() {
         const data = await getBusById(id);
 
         setBus(data);
+        setError("");
       } catch (error) {
         console.error("Failed to fetch bus:", error);
 
@@ -45,7 +59,138 @@ function BusDetailsPage() {
       }
     };
 
-    fetchBus();
+    loadBus();
+  }, [id]);
+
+  // Socket connection status
+  useEffect(() => {
+    const handleConnect = () => {
+      setIsSocketConnected(true);
+    };
+
+    const handleDisconnect = () => {
+      setIsSocketConnected(false);
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+    };
+  }, []);
+
+  // Bus room and real-time seat updates
+  useEffect(() => {
+    if (!id) {
+      return;
+    }
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const joinRoom = async () => {
+      socket.emit("joinBusRoom", id);
+
+      console.log(`🚌 Joined bus room: bus:${id}`);
+
+      try {
+        const latestBus = await getBusById(id);
+
+        setBus(latestBus);
+
+        console.log("🔄 Bus details refreshed after socket connection");
+      } catch (error) {
+        console.error(
+          "❌ Failed to refresh bus after socket connection:",
+          error,
+        );
+      }
+    };
+
+    const handleSeatUpdate = (data: SeatUpdateData) => {
+      console.log("💺 Real-time seat update:", data);
+
+      // Make sure update belongs to current bus
+      if (data.busId !== id) {
+        return;
+      }
+
+      // Validate event type
+      if (data.event !== "booking" && data.event !== "cancellation") {
+        console.error("❌ Invalid seat update event:", data);
+
+        return;
+      }
+
+      // Validate available seats
+      if (typeof data.availableSeats !== "number" || data.availableSeats < 0) {
+        console.error("❌ Invalid seat availability received:", data);
+
+        return;
+      }
+
+      // Validate booked seats
+      if (!Array.isArray(data.bookedSeats)) {
+        console.error("❌ Invalid booked seats received:", data);
+
+        return;
+      }
+
+      // Validate released seats
+      if (!Array.isArray(data.releasedSeats)) {
+        console.error("❌ Invalid released seats received:", data);
+
+        return;
+      }
+
+      // Update available seat count
+      setBus((currentBus) => {
+        if (!currentBus) {
+          return currentBus;
+        }
+
+        const safeAvailableSeats = Math.min(
+          data.availableSeats,
+          currentBus.totalSeats,
+        );
+
+        if (currentBus.availableSeats === safeAvailableSeats) {
+          return currentBus;
+        }
+
+        setSeatUpdateMessage("⚡ Seat availability updated");
+
+        return {
+          ...currentBus,
+          availableSeats: safeAvailableSeats,
+        };
+      });
+
+      // Clear update message
+      setTimeout(() => {
+        setSeatUpdateMessage("");
+      }, 3000);
+    };
+
+    socket.on("connect", joinRoom);
+    socket.on("seatUpdate", handleSeatUpdate);
+
+    // Join immediately if already connected
+    if (socket.connected) {
+      joinRoom();
+    }
+
+    return () => {
+      socket.emit("leaveBusRoom", id);
+
+      socket.off("connect", joinRoom);
+      socket.off("seatUpdate", handleSeatUpdate);
+
+      console.log(`🧹 Cleaned up bus room listener: bus:${id}`);
+    };
   }, [id]);
 
   if (loading) {
@@ -81,8 +226,30 @@ function BusDetailsPage() {
   return (
     <main className="min-h-screen bg-background">
       <section className="mx-auto max-w-7xl px-6 py-10">
+        {/* Header */}
         <div>
           <Badge variant="primary">Bus details</Badge>
+
+          {/* Socket connection status */}
+          <div className="mt-3">
+            <span
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${
+                isSocketConnected
+                  ? "bg-success/10 text-success"
+                  : "bg-red-50 text-red-600"
+              }`}
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  isSocketConnected ? "bg-success" : "bg-red-500"
+                }`}
+              />
+
+              {isSocketConnected
+                ? "Live updates connected"
+                : "Live updates disconnected"}
+            </span>
+          </div>
 
           <h1 className="mt-4 text-3xl font-bold text-primary-dark md:text-4xl">
             {bus.operator}
@@ -158,11 +325,13 @@ function BusDetailsPage() {
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <div className="flex items-center gap-3 rounded-xl bg-background p-4">
                   <Wifi className="text-primary" />
+
                   <span className="font-medium text-primary-dark">Wi-Fi</span>
                 </div>
 
                 <div className="flex items-center gap-3 rounded-xl bg-background p-4">
                   <Zap className="text-primary" />
+
                   <span className="font-medium text-primary-dark">
                     Charging point
                   </span>
@@ -170,6 +339,7 @@ function BusDetailsPage() {
 
                 <div className="flex items-center gap-3 rounded-xl bg-background p-4">
                   <ShieldCheck className="text-primary" />
+
                   <span className="font-medium text-primary-dark">
                     Safety certified
                   </span>
@@ -177,6 +347,7 @@ function BusDetailsPage() {
 
                 <div className="flex items-center gap-3 rounded-xl bg-background p-4">
                   <Armchair className="text-primary" />
+
                   <span className="font-medium text-primary-dark">
                     Comfortable sleeper
                   </span>
@@ -222,6 +393,13 @@ function BusDetailsPage() {
 
           {/* Booking Summary */}
           <Card className="h-fit lg:sticky lg:top-24">
+            {/* Real-time update message */}
+            {seatUpdateMessage && (
+              <div className="mb-5 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-medium text-primary">
+                {seatUpdateMessage}
+              </div>
+            )}
+
             <p className="text-sm text-muted">Starting from</p>
 
             <p className="mt-1 text-3xl font-bold text-primary-dark">
