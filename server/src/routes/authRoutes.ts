@@ -7,11 +7,13 @@ import {
   type AuthRequest,
 } from "../middleware/authMiddleware.js";
 
+import { authRateLimiter } from "../middleware/rateLimiter.js";
+
 const router = Router();
 
-router.post("/register", register);
+router.post("/register", authRateLimiter, register);
 
-router.post("/login", login);
+router.post("/login", authRateLimiter, login);
 
 router.get("/me", authMiddleware, (req: AuthRequest, res) => {
   res.status(200).json({

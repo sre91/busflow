@@ -12,18 +12,30 @@ export const getBuses = async (
   try {
     const { source, destination, busType } = req.query;
 
-    const filter: Record<string, string> = {};
+    const filter: Record<string, unknown> = {};
 
+    // Source - case-insensitive search
     if (typeof source === "string" && source.trim()) {
-      filter.source = source.trim();
+      filter.source = {
+        $regex: `^${source.trim()}$`,
+        $options: "i",
+      };
     }
 
+    // Destination - case-insensitive search
     if (typeof destination === "string" && destination.trim()) {
-      filter.destination = destination.trim();
+      filter.destination = {
+        $regex: `^${destination.trim()}$`,
+        $options: "i",
+      };
     }
 
+    // Bus type - case-insensitive search
     if (typeof busType === "string" && busType.trim()) {
-      filter.busType = busType.trim();
+      filter.busType = {
+        $regex: `^${busType.trim()}$`,
+        $options: "i",
+      };
     }
 
     const buses = await Bus.find(filter);

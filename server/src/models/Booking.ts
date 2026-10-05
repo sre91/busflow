@@ -118,13 +118,6 @@ const bookingSchema = new Schema<IBooking>(
   },
 );
 
-/*
- * Prevent the same seat from being booked twice
- * for the same bus and journey date.
- *
- * The rule applies only to confirmed bookings.
- * Cancelled bookings do not block the seat.
- */
 bookingSchema.index(
   {
     busId: 1,
@@ -139,12 +132,6 @@ bookingSchema.index(
   },
 );
 
-/*
- * Speed up the "My Bookings" query.
- *
- * Bookings are filtered by userId
- * and sorted by newest first.
- */
 bookingSchema.index({
   userId: 1,
   createdAt: -1,

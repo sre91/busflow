@@ -21,6 +21,9 @@
   font-family: Inter, system-ui, sans-serif;
   line-height: 1.5;
   font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -34,6 +37,28 @@ html {
 body {
   margin: 0;
   min-width: 320px;
+  min-height: 100vh;
+  overflow-x: hidden;
+
   background: var(--color-background);
   color: var(--color-text);
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+::selection {
+  background: var(--color-primary);
+  color: white;
 }

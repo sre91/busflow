@@ -2,15 +2,25 @@ import mongoose, { Document, Schema } from "mongoose";
 
 export interface IBus extends Document {
   operator: string;
+
   busType: "AC Seater" | "AC Sleeper" | "Non-AC Seater" | "Non-AC Sleeper";
+
   source: string;
+
   destination: string;
+
   departureTime: string;
+
   arrivalTime: string;
+
   duration: string;
+
   price: number;
+
   rating: number;
+
   totalSeats: number;
+
   availableSeats: number;
 }
 
@@ -80,10 +90,17 @@ const busSchema = new Schema<IBus>(
       min: 0,
     },
   },
+
   {
     timestamps: true,
   },
 );
+
+busSchema.index({
+  source: 1,
+  destination: 1,
+  busType: 1,
+});
 
 const Bus = mongoose.model<IBus>("Bus", busSchema);
 

@@ -15,6 +15,7 @@ type BusCardProps = {
   rating: number;
   seatsAvailable: number;
   price: number;
+  journeyDate: string;
 };
 
 function BusCard({
@@ -27,8 +28,13 @@ function BusCard({
   rating,
   seatsAvailable,
   price,
+  journeyDate,
 }: BusCardProps) {
   const navigate = useNavigate();
+
+  const handleViewSeats = () => {
+    navigate(`/bus/${id}?journeyDate=${encodeURIComponent(journeyDate)}`);
+  };
 
   return (
     <Card>
@@ -70,7 +76,7 @@ function BusCard({
           </div>
 
           <div className="mt-3">
-            <Button onClick={() => navigate(`/bus/${id}`)}>View Seats</Button>
+            <Button onClick={handleViewSeats}>View Seats</Button>
           </div>
         </div>
       </div>

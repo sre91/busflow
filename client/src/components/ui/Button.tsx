@@ -1,24 +1,20 @@
-import type { ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 type ButtonProps = {
   children: ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  type?: "button" | "submit" | "reset";
-};
+} & ButtonHTMLAttributes<HTMLButtonElement>;
 
 function Button({
   children,
-  onClick,
-  disabled = false,
+  className = "",
   type = "button",
+  ...props
 }: ButtonProps) {
   return (
     <button
       type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className="
+      className={`
+        cursor-pointer
         rounded-xl
         bg-primary
         px-6
@@ -29,7 +25,9 @@ function Button({
         hover:bg-primary-dark
         disabled:cursor-not-allowed
         disabled:opacity-50
-      "
+        ${className}
+      `}
+      {...props}
     >
       {children}
     </button>

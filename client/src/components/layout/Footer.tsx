@@ -1,53 +1,78 @@
+import { BusFront } from "lucide-react";
+import { Link } from "react-router-dom";
+
 function Footer() {
   return (
     <footer className="border-t border-slate-200 bg-primary-dark text-white">
-      <div className="mx-auto max-w-7xl px-6 py-12">
-        <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🚌</span>
+      <div className="mx-auto max-w-7xl px-6 py-10">
+        <div className="flex flex-col items-center justify-between gap-8 md:flex-row md:items-start">
+          {/* Brand */}
 
-              <span className="text-xl font-bold">BusFlow</span>
-            </div>
+          <div className="text-center md:text-left">
+            <Link
+              to="/"
+              className="group flex items-center justify-center gap-2.5 md:justify-start"
+            >
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-sm transition duration-200 group-hover:scale-105">
+                <BusFront size={21} strokeWidth={2.2} />
+              </div>
 
-            <p className="mt-4 max-w-xs text-sm leading-6 text-slate-300">
-              Your smarter way to discover, book, and manage bus journeys.
+              <span className="text-xl font-bold tracking-tight transition group-hover:text-slate-200">
+                BusFlow
+              </span>
+            </Link>
+
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-slate-300">
+              Your smarter way to travel by bus.
             </p>
           </div>
 
-          <div>
-            <h3 className="font-semibold">Company</h3>
+          {/* Links */}
 
-            <div className="mt-4 space-y-3 text-sm text-slate-300">
-              <p>About</p>
-              <p>Contact</p>
-              <p>Careers</p>
-            </div>
-          </div>
+          <nav
+            aria-label="Footer navigation"
+            className="flex flex-wrap items-center justify-center gap-x-7 gap-y-3 md:pt-2"
+          >
+            <Link
+              to="/about"
+              className="cursor-pointer text-sm text-slate-300 transition hover:text-white"
+            >
+              About
+            </Link>
 
-          <div>
-            <h3 className="font-semibold">Explore</h3>
+            <Link
+              to="/contact"
+              className="cursor-pointer text-sm text-slate-300 transition hover:text-white"
+            >
+              Contact
+            </Link>
 
-            <div className="mt-4 space-y-3 text-sm text-slate-300">
-              <p>Search buses</p>
-              <p>Popular routes</p>
-              <p>My bookings</p>
-            </div>
-          </div>
+            <Link
+              to="/privacy"
+              className="cursor-pointer text-sm text-slate-300 transition hover:text-white"
+            >
+              Privacy
+            </Link>
 
-          <div>
-            <h3 className="font-semibold">Support</h3>
-
-            <div className="mt-4 space-y-3 text-sm text-slate-300">
-              <p>Help center</p>
-              <p>Cancellation</p>
-              <p>Terms & privacy</p>
-            </div>
-          </div>
+            <Link
+              to="/terms"
+              className="cursor-pointer text-sm text-slate-300 transition hover:text-white"
+            >
+              Terms
+            </Link>
+          </nav>
         </div>
 
-        <div className="mt-10 border-t border-white/10 pt-6 text-sm text-slate-400">
-          © 2026 BusFlow. All rights reserved.
+        {/* Copyright */}
+
+        <div className="mt-8 flex flex-col items-center gap-2 border-t border-white/10 pt-5 text-center sm:flex-row sm:justify-between">
+          <p className="text-xs text-slate-400">
+            © 2026 BusFlow. Created By sreenath.
+          </p>
+
+          <p className="text-xs text-slate-500">
+            Travel smarter. Travel better. 🚌
+          </p>
         </div>
       </div>
     </footer>

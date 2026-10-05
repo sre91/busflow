@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LockKeyhole, Mail } from "lucide-react";
 
 import Badge from "../components/ui/Badge";
@@ -13,9 +13,19 @@ import { loginUser } from "../api/authApi";
 import { useAppDispatch } from "../app/hooks";
 import { setCredentials } from "../features/auth/authSlice";
 
+type LoginLocationState = {
+  returnTo?: string;
+};
+
 function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const dispatch = useAppDispatch();
+
+  const locationState = location.state as LoginLocationState | null;
+
+  const returnTo = locationState?.returnTo || "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,6 +38,7 @@ function LoginPage() {
 
     if (!email.trim() || !password.trim()) {
       setErrorMessage("Email and password are required.");
+
       return;
     }
 
@@ -47,7 +58,9 @@ function LoginPage() {
         }),
       );
 
-      navigate("/");
+      navigate(returnTo, {
+        replace: true,
+      });
     } catch (error) {
       console.error("Login failed:", error);
 
@@ -68,7 +81,7 @@ function LoginPage() {
               Login to BusFlow 🚌
             </h1>
 
-            <p className="mt-2 text-muted">Sign in to manage your bookings.</p>
+            <p className="mt-2 text-muted">Sign in to continue your booking.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">

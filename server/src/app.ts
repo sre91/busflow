@@ -1,32 +1,57 @@
 import express from "express";
 import cors from "cors";
+import compression from "compression";
 
-import notFoundMiddleware from "./middleware/notFoundMiddleware.js";
+import env from "./config/env.js";
+
+import authRoutes from "./routes/authRoutes.js";
+import busRoutes from "./routes/busRoutes.js";
+import bookingRoutes from "./routes/bookingRoutes.js";
+import seatRoutes from "./routes/seatRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
+import chatRoutes from "./routes/chatRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
+import healthRoutes from "./routes/healthRoutes.js";
+
+import { apiRateLimiter } from "./middleware/rateLimiter.js";
 import errorMiddleware from "./middleware/errorMiddleware.js";
-import requestLogger from "./middleware/requestLogger.js";
-import apiRoutes from "./routes/apiRoutes.js";
 
 const app = express();
 
+// CORS
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: env.CLIENT_URL,
+    credentials: true,
   }),
 );
 
+// Rate limiting
+
+app.use(apiRateLimiter);
+
+app.use(compression());
+
 app.use(express.json());
 
-app.use(requestLogger);
+// Routes
 
-app.get("/", (_req, res) => {
-  res.json({
-    message: "Welcome to BusFlow API 🚌",
-  });
-});
+app.use("/health", healthRoutes);
 
-app.use("/api/v1", apiRoutes);
+app.use("/api/auth", authRoutes);
 
-app.use(notFoundMiddleware);
+app.use("/api/buses", busRoutes);
+
+app.use("/api/bookings", bookingRoutes);
+
+app.use("/api/seats", seatRoutes);
+
+app.use("/api/ai", aiRoutes);
+
+app.use("/api/chat", chatRoutes);
+
+app.use("/api/notifications", notificationRoutes);
 
 app.use(errorMiddleware);
 

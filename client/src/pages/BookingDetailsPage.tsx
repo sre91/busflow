@@ -1,461 +1,491 @@
-import { useEffect, useRef, useState } from "react";
-
+import { useEffect, useState } from "react";
 import {
-  ArrowRight,
-  Armchair,
+  CheckCircle2,
   Clock3,
+  CreditCard,
+  Mail,
   MapPin,
-  ShieldCheck,
-  Star,
-  Wifi,
-  Zap,
+  Phone,
+  Ticket,
+  User,
+  XCircle,
 } from "lucide-react";
+
+import { useNavigate, useParams } from "react-router-dom";
 
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
-import { useNavigate, useParams } from "react-router-dom";
-import { getBusById, type Bus } from "../api/busApi";
-import socket from "../socket";
 
-type SeatUpdateData = {
-  event: "booking" | "cancellation";
-  busId: string;
-  bookedSeats: string[];
-  releasedSeats: string[];
-  availableSeats: number;
-};
+import { cancelBooking, getBookingById, type Booking } from "../api/bookingApi";
 
-function BusDetailsPage() {
+function BookingDetailsPage() {
   const navigate = useNavigate();
+
   const { id } = useParams();
 
-  const [bus, setBus] = useState<Bus | null>(null);
+  const [booking, setBooking] = useState<Booking | null>(null);
+
   const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState("");
-  const [seatUpdateMessage, setSeatUpdateMessage] = useState("");
 
-  const seatUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
-  const [isSocketConnected, setIsSocketConnected] = useState(socket.connected);
+  const [cancelMessage, setCancelMessage] = useState("");
 
-  // Fetch bus details
+  // Load booking
+
   useEffect(() => {
-    const loadBus = async () => {
+    const loadBooking = async () => {
       if (!id) {
-        setError("Bus ID is missing");
+        setError("Booking ID is missing");
+
         setLoading(false);
+
         return;
       }
 
       try {
-        const data = await getBusById(id);
+        setLoading(true);
 
-        setBus(data);
         setError("");
-      } catch (error) {
-        console.error("Failed to fetch bus:", error);
 
-        setError("Unable to load bus details");
+        const data = await getBookingById(id);
+
+        setBooking(data);
+      } catch (error) {
+        console.error("Failed to load booking:", error);
+
+        setError("Unable to load booking details");
       } finally {
         setLoading(false);
       }
     };
 
-    loadBus();
+    loadBooking();
   }, [id]);
 
-  // Socket connection status
-  useEffect(() => {
-    const handleConnect = () => {
-      setIsSocketConnected(true);
-    };
+  // Cancel booking
 
-    const handleDisconnect = () => {
-      setIsSocketConnected(false);
-    };
-
-    socket.on("connect", handleConnect);
-    socket.on("disconnect", handleDisconnect);
-
-    return () => {
-      socket.off("connect", handleConnect);
-      socket.off("disconnect", handleDisconnect);
-    };
-  }, []);
-
-  // Bus room and real-time seat updates
-  useEffect(() => {
-    if (!id) {
+  const handleCancelBooking = async () => {
+    if (!id || !booking) {
       return;
     }
 
-    if (!socket.connected) {
-      socket.connect();
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel this booking?",
+    );
+
+    if (!confirmed) {
+      return;
     }
 
-    const joinRoom = async () => {
-      socket.emit("joinBusRoom", id);
+    try {
+      setIsCancelling(true);
 
-      console.log(`🚌 Joined bus room: bus:${id}`);
+      setCancelMessage("");
 
-      try {
-        const latestBus = await getBusById(id);
+      const updatedBooking = await cancelBooking(id);
 
-        setBus(latestBus);
+      setBooking(updatedBooking);
 
-        console.log("🔄 Bus details refreshed after socket connection");
-      } catch (error) {
-        console.error(
-          "❌ Failed to refresh bus after socket connection:",
-          error,
-        );
-      }
-    };
+      setCancelMessage("Booking cancelled successfully.");
+    } catch (error) {
+      console.error("Failed to cancel booking:", error);
 
-    const handleSeatUpdate = (data: SeatUpdateData) => {
-      console.log("💺 Real-time seat update:", data);
-
-      // Make sure update belongs to current bus
-      if (data.busId !== id) {
-        return;
-      }
-
-      // Validate event type
-      if (data.event !== "booking" && data.event !== "cancellation") {
-        console.error("❌ Invalid seat update event:", data);
-
-        return;
-      }
-
-      // Validate available seats
-      if (typeof data.availableSeats !== "number" || data.availableSeats < 0) {
-        console.error("❌ Invalid seat availability received:", data);
-
-        return;
-      }
-
-      // Validate booked seats
-      if (!Array.isArray(data.bookedSeats)) {
-        console.error("❌ Invalid booked seats received:", data);
-
-        return;
-      }
-
-      // Validate released seats
-      if (!Array.isArray(data.releasedSeats)) {
-        console.error("❌ Invalid released seats received:", data);
-
-        return;
-      }
-
-      // Update available seat count
-      setBus((currentBus) => {
-        if (!currentBus) {
-          return currentBus;
-        }
-
-        const safeAvailableSeats = Math.min(
-          data.availableSeats,
-          currentBus.totalSeats,
-        );
-
-        if (currentBus.availableSeats === safeAvailableSeats) {
-          return currentBus;
-        }
-
-        setSeatUpdateMessage("⚡ Seat availability updated");
-
-        return {
-          ...currentBus,
-          availableSeats: safeAvailableSeats,
-        };
-      });
-
-      // Clear the previous timer
-      if (seatUpdateTimerRef.current) {
-        clearTimeout(seatUpdateTimerRef.current);
-      }
-
-      // Start a new timer
-      seatUpdateTimerRef.current = setTimeout(() => {
-        setSeatUpdateMessage("");
-        seatUpdateTimerRef.current = null;
-      }, 3000);
-    };
-
-    socket.on("connect", joinRoom);
-    socket.on("seatUpdate", handleSeatUpdate);
-
-    // Join immediately if already connected
-    if (socket.connected) {
-      joinRoom();
+      setCancelMessage("Unable to cancel this booking. Please try again.");
+    } finally {
+      setIsCancelling(false);
     }
+  };
 
-    return () => {
-      socket.emit("leaveBusRoom", id);
-
-      // Clear notification timer
-      if (seatUpdateTimerRef.current) {
-        clearTimeout(seatUpdateTimerRef.current);
-
-        seatUpdateTimerRef.current = null;
-      }
-
-      socket.off("connect", joinRoom);
-
-      socket.off("seatUpdate", handleSeatUpdate);
-
-      console.log(`🧹 Cleaned up bus room listener: bus:${id}`);
-    };
-  }, [id]);
+  // Loading
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-lg font-medium text-primary-dark">
-          Loading bus details... 🚌
-        </p>
+      <main className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <Ticket size={28} />
+          </div>
+
+          <p className="mt-5 text-lg font-semibold text-primary-dark">
+            Loading booking details...
+          </p>
+
+          <p className="mt-1 text-sm text-muted">
+            Please wait while we fetch your booking.
+          </p>
+        </div>
       </main>
     );
   }
 
-  if (error || !bus) {
+  // Error
+
+  if (error || !booking) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-primary-dark">
-            Bus not found
+      <main className="flex min-h-screen items-center justify-center bg-background px-4">
+        <Card className="w-full max-w-md border border-slate-200 text-center shadow-sm">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-500">
+            <XCircle size={28} />
+          </div>
+
+          <h1 className="mt-5 text-2xl font-bold text-primary-dark">
+            Booking not found
           </h1>
 
-          <p className="mt-2 text-muted">
-            {error || "Unable to find this bus."}
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            {error || "Unable to find this booking."}
           </p>
 
           <div className="mt-6">
-            <Button onClick={() => navigate("/buses")}>Back to buses</Button>
+            <Button onClick={() => navigate("/bookings")}>
+              Back to my bookings
+            </Button>
           </div>
-        </div>
+        </Card>
       </main>
     );
   }
 
+  const bus = booking.busId;
+
+  const formattedJourneyDate = new Date(
+    `${booking.journeyDate}T00:00:00`,
+  ).toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+  const formattedBookingDate = new Date(booking.createdAt).toLocaleDateString(
+    "en-IN",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    },
+  );
+
+  const isConfirmed = booking.bookingStatus === "confirmed";
+
+  const canCancel =
+    booking.bookingStatus === "confirmed" &&
+    new Date(booking.journeyDate) >= new Date();
+
   return (
     <main className="min-h-screen bg-background">
-      <section className="mx-auto max-w-7xl px-6 py-10">
+      <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6 md:py-12">
         {/* Header */}
-        <div>
-          <Badge variant="primary">Bus details</Badge>
 
-          {/* Socket connection status */}
-          <div className="mt-3">
-            <span
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${
-                isSocketConnected
-                  ? "bg-success/10 text-success"
-                  : "bg-red-50 text-red-600"
-              }`}
-            >
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  isSocketConnected ? "bg-success" : "bg-red-500"
-                }`}
-              />
+        <div className="rounded-2xl border border-slate-200 bg-surface p-6 shadow-sm md:p-8">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <Badge variant={isConfirmed ? "success" : "primary"}>
+                <span className="flex items-center gap-1.5">
+                  {isConfirmed ? (
+                    <CheckCircle2 size={14} />
+                  ) : (
+                    <XCircle size={14} />
+                  )}
 
-              {isSocketConnected
-                ? "Live updates connected"
-                : "Live updates disconnected"}
-            </span>
+                  {booking.bookingStatus}
+                </span>
+              </Badge>
+
+              <h1 className="mt-4 text-3xl font-bold tracking-tight text-primary-dark md:text-4xl">
+                Booking details
+              </h1>
+
+              <p className="mt-2 text-sm text-muted">
+                Booking ID: {booking._id}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-primary/5 px-5 py-3 sm:text-right">
+              <p className="text-xs text-muted">Total paid</p>
+
+              <p className="mt-1 text-2xl font-bold text-primary">
+                ₹{booking.totalAmount}
+              </p>
+            </div>
           </div>
-
-          <h1 className="mt-4 text-3xl font-bold text-primary-dark md:text-4xl">
-            {bus.operator}
-          </h1>
-
-          <p className="mt-2 text-muted">
-            {bus.busType} · {bus.source} → {bus.destination}
-          </p>
         </div>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
-          <div className="space-y-6">
-            {/* Journey */}
-            <Card>
+        {/* Bus information */}
+
+        <Card className="mt-6 border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Ticket size={21} />
+            </div>
+
+            <div>
+              <p className="text-sm text-muted">Bus</p>
+
               <h2 className="text-xl font-bold text-primary-dark">
-                Journey details
+                {bus?.operator || "Bus information unavailable"}
               </h2>
-
-              <div className="mt-8 grid gap-6 md:grid-cols-[1fr_auto_1fr] md:items-center">
-                <div>
-                  <p className="text-sm text-muted">Departure</p>
-
-                  <p className="mt-1 text-2xl font-bold text-primary-dark">
-                    {bus.departureTime}
-                  </p>
-
-                  <p className="mt-2 flex items-center gap-2 text-sm text-muted">
-                    <MapPin size={16} />
-                    {bus.source}
-                  </p>
-                </div>
-
-                <div className="hidden md:block">
-                  <ArrowRight className="text-primary" />
-                </div>
-
-                <div className="md:text-right">
-                  <p className="text-sm text-muted">Arrival</p>
-
-                  <p className="mt-1 text-2xl font-bold text-primary-dark">
-                    {bus.arrivalTime}
-                  </p>
-
-                  <p className="mt-2 flex items-center gap-2 text-sm text-muted md:justify-end">
-                    <MapPin size={16} />
-                    {bus.destination}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-8 flex flex-wrap gap-4 border-t border-slate-100 pt-6 text-sm text-muted">
-                <span className="flex items-center gap-2">
-                  <Clock3 size={16} />
-                  {bus.duration}
-                </span>
-
-                <span className="flex items-center gap-2">
-                  <Star size={16} className="fill-current text-amber-500" />
-                  {bus.rating} rating
-                </span>
-
-                <span className="flex items-center gap-2">
-                  <Armchair size={16} />
-                  {bus.availableSeats} seats available
-                </span>
-              </div>
-            </Card>
-
-            {/* Amenities */}
-            <Card>
-              <h2 className="text-xl font-bold text-primary-dark">Amenities</h2>
-
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <div className="flex items-center gap-3 rounded-xl bg-background p-4">
-                  <Wifi className="text-primary" />
-
-                  <span className="font-medium text-primary-dark">Wi-Fi</span>
-                </div>
-
-                <div className="flex items-center gap-3 rounded-xl bg-background p-4">
-                  <Zap className="text-primary" />
-
-                  <span className="font-medium text-primary-dark">
-                    Charging point
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3 rounded-xl bg-background p-4">
-                  <ShieldCheck className="text-primary" />
-
-                  <span className="font-medium text-primary-dark">
-                    Safety certified
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3 rounded-xl bg-background p-4">
-                  <Armchair className="text-primary" />
-
-                  <span className="font-medium text-primary-dark">
-                    Comfortable sleeper
-                  </span>
-                </div>
-              </div>
-            </Card>
-
-            {/* Boarding points */}
-            <Card>
-              <h2 className="text-xl font-bold text-primary-dark">
-                Boarding points
-              </h2>
-
-              <div className="mt-6 space-y-4">
-                <div className="flex items-start gap-4">
-                  <div className="mt-1 h-3 w-3 rounded-full bg-primary" />
-
-                  <div>
-                    <p className="font-semibold text-primary-dark">
-                      Koyambedu Bus Terminal
-                    </p>
-
-                    <p className="mt-1 text-sm text-muted">
-                      Boarding at 10:00 PM
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="mt-1 h-3 w-3 rounded-full bg-primary" />
-
-                  <div>
-                    <p className="font-semibold text-primary-dark">Porur</p>
-
-                    <p className="mt-1 text-sm text-muted">
-                      Boarding at 10:20 PM
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </Card>
+            </div>
           </div>
 
-          {/* Booking Summary */}
-          <Card className="h-fit lg:sticky lg:top-24">
-            {/* Real-time update message */}
-            {seatUpdateMessage && (
-              <div className="mb-5 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-medium text-primary">
-                {seatUpdateMessage}
+          {bus ? (
+            <>
+              <div className="mt-7 rounded-2xl bg-background p-5">
+                <div className="grid gap-6 md:grid-cols-[1fr_auto_1fr] md:items-center">
+                  <div>
+                    <p className="text-xs text-muted">From</p>
+
+                    <p className="mt-1 text-xl font-bold text-primary-dark">
+                      {bus.source}
+                    </p>
+
+                    <p className="mt-1 flex items-center gap-2 text-sm text-muted">
+                      <MapPin size={15} />
+                      Departure: {bus.departureTime || "Not available"}
+                    </p>
+                  </div>
+
+                  <div className="hidden md:block">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <MapPin size={18} />
+                    </div>
+                  </div>
+
+                  <div className="md:text-right">
+                    <p className="text-xs text-muted">To</p>
+
+                    <p className="mt-1 text-xl font-bold text-primary-dark">
+                      {bus.destination}
+                    </p>
+
+                    <p className="mt-1 flex items-center gap-2 text-sm text-muted md:justify-end">
+                      <Clock3 size={15} />
+                      Arrival: {bus.arrivalTime || "Not available"}
+                    </p>
+                  </div>
+                </div>
               </div>
-            )}
 
-            <p className="text-sm text-muted">Starting from</p>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-xl bg-background p-4">
+                  <p className="text-xs text-muted">Bus type</p>
 
-            <p className="mt-1 text-3xl font-bold text-primary-dark">
-              ₹{bus.price}
-            </p>
+                  <p className="mt-1 font-semibold text-primary-dark">
+                    {bus.busType}
+                  </p>
+                </div>
 
-            <div className="my-6 border-t border-slate-200" />
+                <div className="rounded-xl bg-background p-4">
+                  <p className="text-xs text-muted">Journey date</p>
 
-            <div className="space-y-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted">Bus type</span>
+                  <p className="mt-1 font-semibold text-primary-dark">
+                    {formattedJourneyDate}
+                  </p>
+                </div>
 
-                <span className="font-semibold text-primary-dark">
-                  {bus.busType}
-                </span>
+                <div className="rounded-xl bg-background p-4">
+                  <p className="text-xs text-muted">Seats</p>
+
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {booking.seats.map((seat) => (
+                      <Badge key={seat}>{seat}</Badge>
+                    ))}
+                  </div>
+                </div>
               </div>
+            </>
+          ) : (
+            <div className="mt-6 rounded-xl bg-amber-50 p-4">
+              <p className="font-semibold text-primary-dark">
+                Bus information unavailable
+              </p>
 
-              <div className="flex justify-between">
-                <span className="text-muted">Seats available</span>
+              <p className="mt-1 text-sm text-muted">
+                The bus associated with this booking is no longer available.
+              </p>
 
-                <span className="font-semibold text-success">
-                  {bus.availableSeats} seats
-                </span>
+              <p className="mt-1 text-sm text-muted">
+                Your booking record is still available.
+              </p>
+            </div>
+          )}
+        </Card>
+
+        {/* Passenger information */}
+
+        <Card className="mt-6 border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <User size={21} />
+            </div>
+
+            <div>
+              <p className="text-sm text-muted">Passenger</p>
+
+              <h2 className="text-xl font-bold text-primary-dark">
+                Passenger details
+              </h2>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted">Name</p>
+
+              <p className="mt-1 font-semibold text-primary-dark">
+                {booking.passenger.name}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted">Age</p>
+
+              <p className="mt-1 font-semibold text-primary-dark">
+                {booking.passenger.age}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted">
+                Gender
+              </p>
+
+              <p className="mt-1 font-semibold text-primary-dark">
+                {booking.passenger.gender}
+              </p>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <Phone size={17} className="mt-0.5 text-primary" />
+
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted">
+                  Phone
+                </p>
+
+                <p className="mt-1 font-semibold text-primary-dark">
+                  {booking.passenger.phone}
+                </p>
               </div>
             </div>
 
-            <div className="mt-7">
-              <Button onClick={() => navigate(`/bus/${id}/seats`)}>
-                <span className="flex items-center justify-center gap-2">
-                  <Armchair size={18} />
-                  Select Seats
-                </span>
-              </Button>
+            <div className="flex items-start gap-2 sm:col-span-2">
+              <Mail size={17} className="mt-0.5 text-primary" />
+
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted">
+                  Email
+                </p>
+
+                <p className="mt-1 break-all font-semibold text-primary-dark">
+                  {booking.passenger.email}
+                </p>
+              </div>
             </div>
-          </Card>
+          </div>
+        </Card>
+
+        {/* Payment information */}
+
+        <Card className="mt-6 border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <CreditCard size={21} />
+            </div>
+
+            <div>
+              <p className="text-sm text-muted">Payment</p>
+
+              <h2 className="text-xl font-bold text-primary-dark">
+                Payment details
+              </h2>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted">
+                Method
+              </p>
+
+              <p className="mt-1 font-semibold uppercase text-primary-dark">
+                {booking.paymentMethod}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted">
+                Status
+              </p>
+
+              <p className="mt-1 font-semibold text-success">
+                {booking.paymentStatus}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted">
+                Booking date
+              </p>
+
+              <p className="mt-1 font-semibold text-primary-dark">
+                {formattedBookingDate}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted">
+                Amount
+              </p>
+
+              <p className="mt-1 font-semibold text-primary">
+                ₹{booking.totalAmount}
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Cancellation message */}
+
+        {cancelMessage && (
+          <div
+            className={`mt-6 rounded-xl border px-4 py-3 text-sm font-medium ${
+              booking.bookingStatus === "cancelled"
+                ? "border-success/20 bg-success/10 text-success"
+                : "border-red-200 bg-red-50 text-red-600"
+            }`}
+          >
+            {cancelMessage}
+          </div>
+        )}
+
+        {/* Actions */}
+
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+          <Button
+            className="w-full sm:w-auto"
+            onClick={() => navigate("/bookings")}
+          >
+            Back to my bookings
+          </Button>
+
+          {canCancel && (
+            <Button
+              className="w-full bg-red-500 hover:bg-red-600 sm:w-auto"
+              disabled={isCancelling}
+              onClick={handleCancelBooking}
+            >
+              {isCancelling ? "Cancelling..." : "Cancel booking"}
+            </Button>
+          )}
         </div>
       </section>
     </main>
   );
 }
 
-export default BusDetailsPage;
+export default BookingDetailsPage;

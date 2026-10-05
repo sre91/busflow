@@ -1,16 +1,24 @@
-import { NextFunction, Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 
 const errorMiddleware = (
-  err: Error,
+  error: unknown,
   _req: Request,
   res: Response,
-  _next: NextFunction,
+  next: NextFunction,
 ) => {
-  console.error("❌ Server Error:", err.message);
+  console.error("❌ Server error:", error);
 
-  res.status(500).json({
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+
+  const message =
+    error instanceof Error ? error.message : "Internal server error";
+
+  return res.status(500).json({
     success: false,
-    message: "Something went wrong on the server",
+    message,
   });
 };
 

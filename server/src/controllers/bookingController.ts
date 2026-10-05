@@ -4,10 +4,14 @@ import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import Bus from "../models/Bus.js";
 import Seat from "../models/Seat.js";
+
 import { AuthRequest } from "../middleware/authMiddleware.js";
+
 import { getIO } from "../socket/socket.js";
 
-// Create booking
+import { invalidateBusSearchCache } from "../services/busCacheService.js";
+import { createNotification } from "../services/notificationService.js";
+
 export const createBooking = async (
   req: AuthRequest,
   res: Response,
@@ -136,9 +140,11 @@ export const createBooking = async (
     }
 
     const startOfDay = new Date(selectedJourneyDate);
+
     startOfDay.setHours(0, 0, 0, 0);
 
     const endOfDay = new Date(selectedJourneyDate);
+
     endOfDay.setHours(23, 59, 59, 999);
 
     const existingBookings = await Booking.find({
@@ -184,13 +190,21 @@ export const createBooking = async (
       [
         {
           userId: req.user.userId,
+
           busId,
+
           journeyDate: selectedJourneyDate,
+
           passenger,
+
           seats: uniqueSeats,
+
           totalAmount,
+
           paymentMethod,
+
           paymentStatus: "paid",
+
           bookingStatus: "confirmed",
         },
       ],
@@ -223,16 +237,42 @@ export const createBooking = async (
     });
 
     await session.commitTransaction();
+
     session.endSession();
 
-    // Real-time seat update after successful booking
+    try {
+      await invalidateBusSearchCache();
+    } catch (error) {
+      console.error("❌ Failed to invalidate bus search cache:", error);
+    }
+
+    try {
+      const notification = await createNotification(
+        req.user.userId,
+        "booking",
+        "Booking Confirmed 🎫",
+        `Your booking on ${bus.operator} from ${bus.source} to ${bus.destination} has been confirmed. Seats: ${uniqueSeats.join(", ")}.`,
+        booking._id.toString(),
+      );
+
+      const io = getIO();
+
+      io.to(`user:${req.user.userId}`).emit("newNotification", notification);
+    } catch (error) {
+      console.error("❌ Failed to create booking notification:", error);
+    }
+
     const io = getIO();
 
     io.to(`bus:${busId}`).emit("seatUpdate", {
       event: "booking",
+
       busId,
+
       bookedSeats: uniqueSeats,
+
       releasedSeats: [],
+
       availableSeats: bus.availableSeats,
     });
 
@@ -243,7 +283,9 @@ export const createBooking = async (
 
     return res.status(201).json({
       success: true,
+
       message: "Booking created successfully",
+
       data: populatedBooking,
     });
   } catch (error) {
@@ -267,7 +309,6 @@ export const createBooking = async (
   }
 };
 
-// Get current user's bookings
 export const getMyBookings = async (
   req: AuthRequest,
   res: Response,
@@ -302,7 +343,6 @@ export const getMyBookings = async (
   }
 };
 
-// Get booking by ID
 export const getBookingById = async (
   req: AuthRequest,
   res: Response,
@@ -350,7 +390,6 @@ export const getBookingById = async (
   }
 };
 
-// Cancel booking
 export const cancelBooking = async (
   req: AuthRequest,
   res: Response,
@@ -441,6 +480,7 @@ export const cancelBooking = async (
     await Seat.updateMany(
       {
         busId: booking.busId,
+
         seatNumber: {
           $in: booking.seats,
         },
@@ -456,16 +496,42 @@ export const cancelBooking = async (
     );
 
     await session.commitTransaction();
+
     session.endSession();
 
-    // Real-time seat update after successful cancellation
+    try {
+      await invalidateBusSearchCache();
+    } catch (error) {
+      console.error("❌ Failed to invalidate bus search cache:", error);
+    }
+
+    try {
+      const notification = await createNotification(
+        req.user.userId,
+        "cancellation",
+        "Booking Cancelled ❌",
+        `Your booking on ${bus.operator} from ${bus.source} to ${bus.destination} has been cancelled. Seats released: ${booking.seats.join(", ")}.`,
+        booking._id.toString(),
+      );
+
+      const io = getIO();
+
+      io.to(`user:${req.user.userId}`).emit("newNotification", notification);
+    } catch (error) {
+      console.error("❌ Failed to create cancellation notification:", error);
+    }
+
     const io = getIO();
 
     io.to(`bus:${booking.busId.toString()}`).emit("seatUpdate", {
       event: "cancellation",
+
       busId: booking.busId.toString(),
+
       bookedSeats: [],
+
       releasedSeats: booking.seats,
+
       availableSeats: bus.availableSeats,
     });
 
@@ -476,7 +542,9 @@ export const cancelBooking = async (
 
     return res.status(200).json({
       success: true,
+
       message: "Booking cancelled successfully",
+
       data: populatedBooking,
     });
   } catch (error) {

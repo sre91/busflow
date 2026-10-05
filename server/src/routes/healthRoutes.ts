@@ -1,17 +1,9 @@
 import { Router } from "express";
 
-import { sendSuccess } from "../utils/apiResponse.js";
+import { getHealth } from "../controllers/healthController.js";
 
 const router = Router();
 
-router.get("/", (_req, res) => {
-  sendSuccess(
-    res,
-    {
-      status: "ok",
-    },
-    "BusFlow API is healthy 🚌",
-  );
-});
+router.get("/", getHealth);
 
 export default router;
