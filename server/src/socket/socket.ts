@@ -1,5 +1,7 @@
 import { Server } from "socket.io";
 
+import env from "../config/env.js";
+
 import Conversation from "../models/Conversation.js";
 
 import {
@@ -26,13 +28,15 @@ const MESSAGE_WINDOW = 60 * 1000;
 export const initializeSocket = (server: any) => {
   io = new Server(server, {
     cors: {
-      origin: "http://localhost:5173",
+      origin: env.CLIENT_URL,
       credentials: true,
     },
   });
 
   io.on("connection", (socket) => {
     console.log("🔌 Socket connected:", socket.id);
+
+    // Join user room
 
     socket.on("joinUser", (userId: string) => {
       if (!userId || typeof userId !== "string") {
@@ -138,6 +142,8 @@ export const initializeSocket = (server: any) => {
       console.log(`💬 Socket ${socket.id} left ${room}`);
     });
 
+    // Send chat message
+
     socket.on("sendMessage", async (data) => {
       try {
         const { conversationId, senderId, content } = data || {};
@@ -229,6 +235,8 @@ export const initializeSocket = (server: any) => {
       }
     });
 
+    // Mark messages as read
+
     socket.on("markMessagesAsRead", async (data) => {
       try {
         const { conversationId, userId } = data || {};
@@ -262,6 +270,8 @@ export const initializeSocket = (server: any) => {
       }
     });
 
+    // Test Socket.IO connection
+
     socket.on("testEvent", (data) => {
       console.log("🧪 Test event received:", data);
 
@@ -270,6 +280,8 @@ export const initializeSocket = (server: any) => {
         data,
       });
     });
+
+    // Disconnect
 
     socket.on("disconnect", (reason) => {
       console.log("🔌 Socket disconnected:", socket.id, reason);
