@@ -18,6 +18,8 @@ import errorMiddleware from "./middleware/errorMiddleware.js";
 
 const app = express();
 
+app.set("trust proxy", 1);
+
 // CORS
 
 app.use(
